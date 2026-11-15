@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ArrowRightLeft,
   Loader2,
   Pencil,
   Plus,
@@ -116,6 +117,8 @@ interface ClienteCarteira {
   status_label: string;
 }
 
+type OrigemCliente = 'carteira' | 'fora';
+
 interface Eu {
   login: string;
   nome: string;
@@ -200,6 +203,13 @@ export function AgendaVendas() {
   const [clientes, setClientes] = useState<ClienteCarteira[]>([]);
   const [carregandoClientes, setCarregandoClientes] = useState(false);
   const [buscaCliente, setBuscaCliente] = useState('');
+  const [origemCliente, setOrigemCliente] = useState<OrigemCliente>('carteira');
+
+  // ============ TRANSFERÊNCIA DE AGENDA ============
+  const [loginOrigemTransferencia, setLoginOrigemTransferencia] = useState('');
+  const [loginDestinoTransferencia, setLoginDestinoTransferencia] = useState('');
+  const [periodoTransferencia, setPeriodoTransferencia] = useState({ ini: '', fim: '' });
+  const [transferindo, setTransferindo] = useState(false);
 
   const [cumprindo, setCumprindo] = useState<number | null>(null);
 
@@ -322,18 +332,24 @@ export function AgendaVendas() {
   };
 
   // ============ CARTEIRA ============
-  const carregarClientes = useCallback(async (login: string) => {
+  const carregarClientes = useCallback(async (login: string, origem: OrigemCliente): Promise<ClienteCarteira[]> => {
     if (!login) {
       setClientes([]);
-      return;
+      return [];
     }
     try {
       setCarregandoClientes(true);
-      const resp = await apiFetch(`${API}?action=clientes&login=${encodeURIComponent(login)}`);
-      setClientes(resp?.success && Array.isArray(resp.clientes) ? (resp.clientes as ClienteCarteira[]) : []);
+      const qs = new URLSearchParams({ action: 'clientes', login, origem });
+      const resp = await apiFetch(`${API}?${qs.toString()}`);
+      const lista = resp?.success && Array.isArray(resp.clientes)
+        ? (resp.clientes as ClienteCarteira[])
+        : [];
+      setClientes(lista);
+      return lista;
     } catch (e) {
-      console.error('Erro ao carregar a carteira do vendedor:', e);
+      console.error('Erro ao carregar os clientes:', e);
       setClientes([]);
+      return [];
     } finally {
       setCarregandoClientes(false);
     }
@@ -347,19 +363,20 @@ export function AgendaVendas() {
     setFormCodigoAcao('');
     setFormObservacao('');
     setBuscaCliente('');
+    setOrigemCliente('carteira');
 
     if (ehVendedor) {
       setFormLogin(eu?.login ?? '');
-      carregarClientes(eu?.login ?? '');
+      void carregarClientes(eu?.login ?? '', 'carteira');
     } else {
       const inicial = loginsFiltro.length === 1 ? loginsFiltro[0] : '';
       setFormLogin(inicial);
-      carregarClientes(inicial);
+      void carregarClientes(inicial, 'carteira');
     }
     setDialogOpen(true);
   };
 
-  const abrirEdicao = (item: AgendaItem) => {
+  const abrirEdicao = async (item: AgendaItem) => {
     setEditando(item);
     setFormData(item.data);
     setFormLogin(item.login);
@@ -367,30 +384,52 @@ export function AgendaVendas() {
     setFormCodigoAcao(String(item.codigo_acao_venda));
     setFormObservacao(item.observacao);
     setBuscaCliente('');
+    setOrigemCliente('carteira');
     setDialogOpen(true);
+
+    const carteira = await carregarClientes(item.login, 'carteira');
+    if (!carteira.some((c) => c.cnpj.replace(/\D/g, '') === item.cnpj.replace(/\D/g, ''))) {
+      setOrigemCliente('fora');
+      await carregarClientes(item.login, 'fora');
+    }
   };
 
-  const trocarVendedorForm = (login: string) => {
+  const trocarVendedorForm = async (login: string) => {
+    const cnpjAnterior = formCnpj;
     setFormLogin(login);
+    setBuscaCliente('');
+    if (!editando) {
+      setFormCnpj('');
+      await carregarClientes(login, origemCliente);
+      return;
+    }
+
+    const lista = await carregarClientes(login, origemCliente);
+    if (cnpjAnterior && !lista.some((c) => c.cnpj.replace(/\D/g, '') === cnpjAnterior.replace(/\D/g, ''))) {
+      setOrigemCliente('fora');
+      await carregarClientes(login, 'fora');
+    }
+  };
+
+  const trocarOrigemCliente = (origem: OrigemCliente) => {
+    setOrigemCliente(origem);
     setFormCnpj('');
     setBuscaCliente('');
-    carregarClientes(login);
+    void carregarClientes(formLogin, origem);
   };
 
   const salvar = async () => {
-    if (!editando) {
-      if (!formData) {
-        toast.error('Informe a data do compromisso');
-        return;
-      }
-      if (!formLogin) {
-        toast.error('Informe o vendedor');
-        return;
-      }
-      if (!formCnpj) {
-        toast.error('Selecione o cliente');
-        return;
-      }
+    if (!formData) {
+      toast.error('Informe a data do compromisso');
+      return;
+    }
+    if (!formLogin) {
+      toast.error('Informe o vendedor');
+      return;
+    }
+    if (!formCnpj) {
+      toast.error('Selecione o cliente');
+      return;
     }
     if (!formCodigoAcao) {
       toast.error('Selecione a ação de venda');
@@ -406,6 +445,9 @@ export function AgendaVendas() {
             ? {
                 action: 'atualizar',
                 seq_agenda: editando.seq_agenda,
+                data: formData,
+                login: formLogin,
+                cnpj: formCnpj,
                 codigo_acao_venda: Number(formCodigoAcao),
                 observacao: formObservacao,
               }
@@ -414,6 +456,7 @@ export function AgendaVendas() {
                 data: formData,
                 login: formLogin,
                 cnpj: formCnpj,
+                origem_cliente: origemCliente,
                 codigo_acao_venda: Number(formCodigoAcao),
                 observacao: formObservacao,
               }
@@ -427,6 +470,61 @@ export function AgendaVendas() {
       console.error('Erro ao salvar o compromisso:', e);
     } finally {
       setSalvando(false);
+    }
+  };
+
+  const transferirAgenda = async () => {
+    if (!loginOrigemTransferencia || !loginDestinoTransferencia) {
+      toast.error('Selecione os vendedores de origem e destino');
+      return;
+    }
+    if (loginOrigemTransferencia.toLowerCase() === loginDestinoTransferencia.toLowerCase()) {
+      toast.error('Escolha vendedores diferentes');
+      return;
+    }
+    if (
+      periodoTransferencia.ini &&
+      periodoTransferencia.fim &&
+      periodoTransferencia.ini > periodoTransferencia.fim
+    ) {
+      toast.error('A data inicial não pode ser posterior à data final');
+      return;
+    }
+
+    const periodoTexto = periodoTransferencia.ini || periodoTransferencia.fim
+      ? ` no período ${periodoTransferencia.ini || 'sem início'} a ${periodoTransferencia.fim || 'sem fim'}`
+      : '';
+    const ok = await confirmar({
+      title: 'Transferir agenda',
+      description: `Transferir os compromissos pendentes de ${
+        vendedores.find((v) => v.login === loginOrigemTransferencia)?.nome || loginOrigemTransferencia
+      } para ${
+        vendedores.find((v) => v.login === loginDestinoTransferencia)?.nome || loginDestinoTransferencia
+      }${periodoTexto}? Compromissos já cumpridos permanecerão com o vendedor original.`,
+      confirmText: 'Transferir',
+      cancelText: 'Cancelar',
+    });
+    if (!ok) return;
+
+    setTransferindo(true);
+    try {
+      const resp = await apiFetch(API, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'transferir_agenda',
+          login_origem: loginOrigemTransferencia,
+          login_destino: loginDestinoTransferencia,
+          ini: periodoTransferencia.ini,
+          fim: periodoTransferencia.fim,
+        }),
+      });
+      if (!resp?.success) return;
+      toast.success(resp.message || 'Agenda transferida com sucesso.');
+      await carregar();
+    } catch (e) {
+      console.error('Erro ao transferir a agenda:', e);
+    } finally {
+      setTransferindo(false);
     }
   };
 
@@ -456,7 +554,10 @@ export function AgendaVendas() {
     }
   };
 
-  const nomeClienteSelecionado = clientes.find((c) => c.cnpj === formCnpj);
+  const nomeClienteSelecionado = clientes.find(
+    (c) => c.cnpj.replace(/\D/g, '') === formCnpj.replace(/\D/g, '')
+  );
+  const compromissoCumprido = !!editando?.cumprida;
 
   return (
     <AdminLayout title="AGENDA DE VENDAS">
@@ -468,8 +569,8 @@ export function AgendaVendas() {
               Agenda de vendas
             </CardTitle>
             <CardDescription>
-              Programe as ações de venda para os clientes da carteira. Ao confirmar o cumprimento, o
-              status do cliente passa a ser o status da ação.
+              Programe ações para clientes da carteira ou prospectados. Ao confirmar o cumprimento,
+              o status do cliente passa a ser o status da ação.
             </CardDescription>
           </div>
 
@@ -536,12 +637,12 @@ export function AgendaVendas() {
             ) : (
               <div className="space-y-1.5">
                 <span className="text-[11px] font-medium text-muted-foreground">Vendedores</span>
-                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+                <div className="grid grid-cols-2 gap-1 sm:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
                   <button
                     type="button"
                     onClick={() => setLoginsFiltro([])}
                     className={cn(
-                      'flex min-w-0 items-center justify-center rounded-md border px-2 py-1.5 text-[11px] font-medium transition-colors',
+                      'flex min-w-0 items-center justify-center rounded-md border px-1.5 py-1 text-[10px] font-medium transition-colors',
                       loginsFiltro.length === 0
                         ? 'border-primary bg-primary text-primary-foreground'
                         : 'border-border bg-background text-muted-foreground hover:border-primary/50'
@@ -557,8 +658,9 @@ export function AgendaVendas() {
                         key={v.login}
                         type="button"
                         onClick={() => alternarVendedor(v.login)}
+                        title={v.nome || v.login}
                         className={cn(
-                          'flex min-w-0 items-center justify-between gap-1.5 rounded-md border px-2 py-1.5 text-left text-[11px] font-medium transition-colors',
+                          'flex min-w-0 items-center justify-between gap-1 rounded-md border px-1.5 py-1 text-left text-[10px] font-medium transition-colors',
                           ativo ? 'ring-1 ring-inset' : 'bg-background hover:bg-muted/60'
                         )}
                         style={{
@@ -576,6 +678,88 @@ export function AgendaVendas() {
               </div>
             )}
           </div>
+
+          {!ehVendedor && (
+            <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-3">
+              <div className="flex items-center gap-2">
+                <ArrowRightLeft className="size-4 text-primary" />
+                <div>
+                  <h3 className="text-xs font-semibold">Transferir agenda</h3>
+                  <p className="text-[10px] text-muted-foreground">
+                    Transfere compromissos pendentes; os já cumpridos permanecem no vendedor original.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_140px_140px_auto] xl:items-end">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">De vendedor</Label>
+                  <Select value={loginOrigemTransferencia} onValueChange={setLoginOrigemTransferencia}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Origem" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendedores.map((v) => (
+                        <SelectItem key={v.login} value={v.login} className="text-xs">
+                          {v.nome || v.login}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Para vendedor</Label>
+                  <Select value={loginDestinoTransferencia} onValueChange={setLoginDestinoTransferencia}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Destino" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendedores.map((v) => (
+                        <SelectItem key={v.login} value={v.login} className="text-xs">
+                          {v.nome || v.login}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Data inicial (opcional)</Label>
+                  <DateInput
+                    value={periodoTransferencia.ini}
+                    onChange={(e) => setPeriodoTransferencia((p) => ({ ...p, ini: e.target.value }))}
+                    className="h-8 w-full text-xs"
+                    aria-label="Data inicial da transferência"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Data final (opcional)</Label>
+                  <DateInput
+                    value={periodoTransferencia.fim}
+                    onChange={(e) => setPeriodoTransferencia((p) => ({ ...p, fim: e.target.value }))}
+                    className="h-8 w-full text-xs"
+                    aria-label="Data final da transferência"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  className="h-8"
+                  onClick={transferirAgenda}
+                  disabled={
+                    transferindo ||
+                    !loginOrigemTransferencia ||
+                    !loginDestinoTransferencia ||
+                    loginOrigemTransferencia.toLowerCase() === loginDestinoTransferencia.toLowerCase()
+                  }
+                >
+                  {transferindo ? (
+                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                  ) : (
+                    <ArrowRightLeft className="mr-1.5 size-3.5" />
+                  )}
+                  Transferir
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* ===== LEGENDA ===== */}
           <div className="flex flex-wrap items-center gap-4 px-1 text-[11px] text-muted-foreground">
@@ -752,13 +936,15 @@ export function AgendaVendas() {
 
       {/* ===== DIALOG: COMPROMISSO ===== */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editando ? 'Alterar compromisso' : 'Nova ação na agenda'}</DialogTitle>
             <DialogDescription>
               {editando
-                ? 'É possível alterar a ação de venda e a observação. O cliente permanece o mesmo.'
-                : 'Selecione o vendedor, o cliente da carteira e a ação de venda.'}
+                ? compromissoCumprido
+                  ? 'Após o cumprimento, vendedor, cliente e ação ficam preservados. A data e a observação podem ser ajustadas.'
+                  : 'Altere a data, o vendedor, o cliente, a ação de venda e a observação.'
+                : 'Selecione vendedor, origem do cliente, cliente e ação de venda.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -768,7 +954,6 @@ export function AgendaVendas() {
                 <Label className="text-xs">Data</Label>
                 <DateInput
                   value={formData}
-                  disabled={!!editando}
                   onChange={(e) => setFormData(e.target.value)}
                   className="h-8 text-xs"
                 />
@@ -776,7 +961,7 @@ export function AgendaVendas() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs">Vendedor</Label>
-                {ehVendedor || editando ? (
+                {ehVendedor || compromissoCumprido ? (
                   <div className="flex h-8 items-center rounded-md border border-input bg-muted/40 px-2 text-xs text-muted-foreground">
                     {editando
                       ? `${editando.vendedor_nome || editando.login}`
@@ -801,14 +986,24 @@ export function AgendaVendas() {
 
             <div className="space-y-1.5">
               <Label className="text-xs">Cliente</Label>
-              {editando ? (
-                <div className="flex h-8 items-center rounded-md border border-input bg-muted/40 px-2 text-xs text-muted-foreground">
-                  {editando.cliente_nome || editando.cnpj_fmt}
-                </div>
-              ) : !formLogin ? (
-                <p className="text-xs text-muted-foreground">Selecione o vendedor para carregar a carteira.</p>
+              {!formLogin ? (
+                <p className="text-xs text-muted-foreground">Selecione o vendedor para carregar os clientes.</p>
               ) : (
                 <>
+                  <Select
+                    value={origemCliente}
+                    onValueChange={(value) => trocarOrigemCliente(value as OrigemCliente)}
+                    disabled={compromissoCumprido}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="carteira" className="text-xs">Clientes da carteira do vendedor</SelectItem>
+                      <SelectItem value="fora" className="text-xs">Clientes fora da carteira</SelectItem>
+                    </SelectContent>
+                  </Select>
+
                   {formCnpj && (
                     <div className="flex items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-2 py-1 text-xs">
                       <span className="truncate font-medium text-foreground">
@@ -818,6 +1013,7 @@ export function AgendaVendas() {
                       <button
                         type="button"
                         onClick={() => setFormCnpj('')}
+                        disabled={compromissoCumprido}
                         className="text-muted-foreground hover:text-foreground"
                         aria-label="Limpar cliente"
                       >
@@ -831,8 +1027,11 @@ export function AgendaVendas() {
                     <Input
                       value={buscaCliente}
                       onChange={(e) => setBuscaCliente(e.target.value)}
-                      placeholder="Buscar cliente por nome, CNPJ ou cidade..."
+                      placeholder={origemCliente === 'carteira'
+                        ? 'Buscar na carteira por nome, CNPJ ou cidade...'
+                        : 'Buscar fora da carteira por nome, CNPJ ou cidade...'}
                       className="h-8 pl-7 text-xs"
+                      disabled={compromissoCumprido}
                     />
                   </div>
 
@@ -843,7 +1042,9 @@ export function AgendaVendas() {
                       </div>
                     ) : clientesFiltrados.length === 0 ? (
                       <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                        Nenhum cliente encontrado na carteira.
+                        {origemCliente === 'carteira'
+                          ? 'Nenhum cliente encontrado na carteira.'
+                          : 'Nenhum cliente fora da carteira encontrado.'}
                       </p>
                     ) : (
                       clientesFiltrados.map((c) => (
@@ -851,9 +1052,11 @@ export function AgendaVendas() {
                           key={c.cnpj}
                           type="button"
                           onClick={() => setFormCnpj(c.cnpj)}
+                          disabled={compromissoCumprido}
                           className={cn(
                             'flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted',
-                            formCnpj === c.cnpj && 'bg-primary/10'
+                            formCnpj.replace(/\D/g, '') === c.cnpj.replace(/\D/g, '') && 'bg-primary/10',
+                            compromissoCumprido && 'cursor-not-allowed opacity-60'
                           )}
                         >
                           <span className="truncate font-medium text-foreground">{c.nome}</span>
@@ -871,7 +1074,11 @@ export function AgendaVendas() {
 
             <div className="space-y-1.5">
               <Label className="text-xs">Ação de venda</Label>
-              <Select value={formCodigoAcao} onValueChange={setFormCodigoAcao}>
+              <Select
+                value={formCodigoAcao}
+                onValueChange={setFormCodigoAcao}
+                disabled={compromissoCumprido}
+              >
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue placeholder="Selecione a ação" />
                 </SelectTrigger>

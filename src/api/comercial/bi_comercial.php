@@ -55,6 +55,7 @@ $tblCli = "{$domain}_cliente";
 $tblVc  = "{$domain}_vendedor_cliente";
 $tblVnd = "{$domain}_vendedor";
 $tblEmp = "{$domain}_emp_param";
+$tblGc  = "{$domain}_grupo_cliente";
 
 function biColunaExiste(string $tabela, string $coluna): bool {
     $r = sql(
@@ -154,6 +155,46 @@ $comExpr = "(CASE WHEN ({$elig}) THEN {$baseFrete} * COALESCE({$percExpr}, 0) / 
 $statusCol = biColunaExiste($tblVc, 'status') ? "COALESCE(vc.status, 'D')" : "'D'";
 
 // ============================================
+// VISÃO: CLIENTES x GRUPOS
+// ============================================
+// Mesma chave do painel Faturamento de Clientes: em GRUPOS o CNPJ pagador é
+// consolidado no CNPJ principal do grupo ([dominio]_grupo_cliente). Cliente sem
+// grupo cadastrado continua sendo a própria chave (um "grupo" de 1 CNPJ).
+$groupBy = strtolower(trim((string)($_GET['groupBy'] ?? '')));
+$groupBy = $groupBy === 'clientes' ? 'clientes' : 'grupos';
+$grupoOk = $groupBy === 'grupos' && biColunaExiste($tblGc, 'cnpj_principal');
+
+$cnpjGc    = "regexp_replace(COALESCE(gc.cnpj::text, ''), '\\\\D', '', 'g')";
+$cnpjPrin  = "regexp_replace(COALESCE(gc.cnpj_principal::text, ''), '\\\\D', '', 'g')";
+$cnpjVcNrm = "regexp_replace(COALESCE(vcx.cnpj::text, ''), '\\\\D', '', 'g')";
+
+// JOIN do grupo para consultas que usam o CT-e (alias cte) e para a carteira (alias vcx).
+$joinGrupoDoc  = $grupoOk ? "LEFT JOIN {$tblGc} gc ON {$cnpjGc} = {$cnpjPag}" : "";
+$joinGrupoCli  = $grupoOk ? "LEFT JOIN {$tblGc} gc ON {$cnpjGc} = {$cnpjVcNrm}" : "";
+// Chave do agrupamento: CNPJ principal quando existir, senão o próprio CNPJ.
+$grupoKeyDoc   = $grupoOk ? "(CASE WHEN {$cnpjPrin} <> '' THEN {$cnpjPrin} ELSE {$cnpjPag} END)" : "";
+$grupoKeyCli   = $grupoOk ? "(CASE WHEN {$cnpjPrin} <> '' THEN {$cnpjPrin} ELSE {$cnpjVcNrm} END)" : "";
+// Nome do grupo = razão social do CNPJ principal.
+$joinGrupoPrin = $grupoOk
+    ? "LEFT JOIN {$tblCli} cgp ON regexp_replace(COALESCE(cgp.cnpj::text, ''), '\\\\D', '', 'g') = {$grupoKeyDoc}"
+    : "";
+
+// Colunas extras do documento base (só existem em modo GRUPOS).
+$selGrupoKey  = $grupoOk ? "{$grupoKeyDoc} AS grupo_key," : "";
+$selGrupoNome = $grupoOk ? "COALESCE(cgp.nome, '') AS grupo_nome," : "";
+
+// Expressões de agregação por cliente/grupo.
+$chaveCliente = $grupoOk ? 'grupo_key' : 'cnpj_pag';
+$nomeChaveCli = $grupoOk
+    ? "COALESCE(NULLIF(MAX(grupo_nome), ''), MAX(cliente_nome), MAX(nome_pag), MAX(grupo_key))"
+    : "COALESCE(MAX(cliente_nome), MAX(nome_pag), cnpj_pag)";
+// Chave no nível de vínculo (CT-e x vendedor) e nome no nível de linha (JOIN LATERAL).
+$chaveVinc  = $grupoOk ? "COALESCE(NULLIF(grupo_key, ''), cnpj_pag)" : "cnpj_pag";
+$nomeRowCli = $grupoOk
+    ? "COALESCE(NULLIF(d.grupo_nome, ''), NULLIF(d.cliente_nome, ''), NULLIF(d.nome_pag, ''), d.grupo_key)"
+    : "COALESCE(NULLIF(d.cliente_nome, ''), NULLIF(d.nome_pag, ''), d.cnpj_pag)";
+
+// ============================================
 // WHERE + PARÂMETROS
 // ============================================
 $whereParts = [
@@ -248,7 +289,16 @@ if ($action === 'ctes') {
             break;
         case 'cliente':
             if ($valor !== '') {
-                $addFiltro("{$cnpjPag} = {IDX}", preg_replace('/\D/', '', $valor));
+                $dig = preg_replace('/\D/', '', $valor);
+                if ($grupoOk) {
+                    // Em visão por GRUPOS o clique manda o CNPJ principal; traz
+                    // também os CT-es dos demais CNPJs do grupo.
+                    $addFiltro("({$cnpjPag} = {IDX} OR EXISTS (SELECT 1 FROM {$tblGc} gx
+                                        WHERE regexp_replace(COALESCE(gx.cnpj::text, ''), '\\\\D', '', 'g') = {$cnpjPag}
+                                          AND regexp_replace(COALESCE(gx.cnpj_principal::text, ''), '\\\\D', '', 'g') = {IDX}))", $dig);
+                } else {
+                    $addFiltro("{$cnpjPag} = {IDX}", $dig);
+                }
             }
             break;
         case 'status':
@@ -429,6 +479,8 @@ $baseDoc = "
             COALESCE(cte.tp_frete::text, '') AS tp_frete,
             {$statusCol} AS status_vc,
             COALESCE(c.nome, cte.nome_pag) AS cliente_nome,
+            {$selGrupoKey}
+            {$selGrupoNome}
             {$selCidade} AS cidade,
             {$selUf}   AS uf,
             {$selLat},
@@ -444,6 +496,8 @@ $baseDoc = "
         LEFT JOIN {$tblVc}  vc  ON {$cnpjVc}  = {$cnpjPag}
         LEFT JOIN {$tblCli} c   ON {$cnpjCli} = {$cnpjPag}
         LEFT JOIN cidade    cid ON cid.seq_cidade = c.seq_cidade
+        {$joinGrupoDoc}
+        {$joinGrupoPrin}
         {$joinEntr}
         WHERE {$whereSql}
         ORDER BY cte.seq_cte
@@ -455,6 +509,7 @@ $baseVinc = "
         cte.seq_cte,
         cte.data_emissao,
         cte.cnpj_pag,
+        {$selGrupoKey}
         LOWER(vc.login) AS login,
         COALESCE(v.nome, vc.login) AS vendedor_nome,
         COALESCE(cte.vlr_frete, 0) AS vlr_frete,
@@ -462,6 +517,8 @@ $baseVinc = "
     FROM {$tblCte} cte
     INNER JOIN {$tblVc} vc ON {$cnpjVc} = {$cnpjPag}
     LEFT  JOIN {$tblVnd} v ON LOWER(v.login) = LOWER(vc.login)
+    {$joinGrupoDoc}
+    {$joinGrupoPrin}
     WHERE {$whereSql}";
 
 // ============================================
@@ -469,6 +526,7 @@ $baseVinc = "
 // ============================================
 $out = [
     'success'  => true,
+    'visao'    => $grupoOk ? 'grupos' : 'clientes',
     'periodo'  => ['ini' => $ini, 'fim' => $fim, 'dias' => $dias, 'granularidade' => $granularidade],
     'parametros' => [
         'desc_icms'   => $descIcms,
@@ -486,7 +544,7 @@ $q = "WITH docs AS ({$baseDoc})
         COALESCE(SUM(vlr_merc), 0)  AS total_merc,
         COALESCE(SUM(peso), 0)      AS total_peso,
         COALESCE(SUM(volumes), 0)   AS total_volumes,
-        COUNT(DISTINCT cnpj_pag)::int AS clientes_ativos
+        COUNT(DISTINCT {$chaveCliente})::int AS clientes_ativos
       FROM docs";
 $r = sql($q, $params);
 $k = $r ? pg_fetch_assoc($r) : null;
@@ -503,15 +561,16 @@ $q = "WITH vincs AS ({$baseVinc})
 $r = sql($q, $params);
 $comissaoTotal = $r ? (float)(pg_fetch_assoc($r)['comissao'] ?? 0) : 0.0;
 
-// ---- Carteira (total de clientes vinculados) ----
+// ---- Carteira (total de clientes/grupos vinculados) ----
 $carteiraWhere = '';
 $carteiraParams = [];
 if ($login !== '' && $login !== '__todos__') {
-    $carteiraWhere = "WHERE LOWER(login) = LOWER($1)";
+    $carteiraWhere = "WHERE LOWER(vcx.login) = LOWER($1)";
     $carteiraParams = [$login];
 }
-$q = "SELECT COUNT(DISTINCT regexp_replace(COALESCE(cnpj::text, ''), '\\\\D', '', 'g'))::int AS total
-      FROM {$tblVc} {$carteiraWhere}";
+$carteiraChave = $grupoOk ? $grupoKeyCli : "regexp_replace(COALESCE(vcx.cnpj::text, ''), '\\\\D', '', 'g')";
+$q = "SELECT COUNT(DISTINCT {$carteiraChave})::int AS total
+      FROM {$tblVc} vcx {$joinGrupoCli} {$carteiraWhere}";
 $r = sql($q, $carteiraParams);
 $clientesCarteira = $r ? (int)(pg_fetch_assoc($r)['total'] ?? 0) : 0;
 
@@ -531,10 +590,10 @@ $out['kpis'] = [
 // ---- Funil (contagem de clientes por status + frete por status) ----
 $funilClientes = [];
 $q = "SELECT COALESCE(status, 'D') AS s, COUNT(*)::int AS c FROM (
-        SELECT DISTINCT ON (regexp_replace(COALESCE(cnpj::text, ''), '\\\\D', '', 'g'))
-            COALESCE(status, 'D') AS status
-        FROM {$tblVc} {$carteiraWhere}
-        ORDER BY regexp_replace(COALESCE(cnpj::text, ''), '\\\\D', '', 'g')
+        SELECT DISTINCT ON ({$carteiraChave})
+            COALESCE(vcx.status, 'D') AS status
+        FROM {$tblVc} vcx {$joinGrupoCli} {$carteiraWhere}
+        ORDER BY {$carteiraChave}
       ) t GROUP BY s";
 $r = sql($q, $carteiraParams);
 if ($r) { while ($row = pg_fetch_assoc($r)) { $funilClientes[trim((string)$row['s'])] = (int)$row['c']; } }
@@ -613,7 +672,7 @@ $q = "WITH vincs AS ({$baseVinc})
         login,
         MAX(vendedor_nome) AS nome,
         COUNT(DISTINCT seq_cte)::int AS ctes,
-        COUNT(DISTINCT cnpj_pag)::int AS clientes_ativos,
+        COUNT(DISTINCT {$chaveVinc})::int AS clientes_ativos,
         COALESCE(SUM(vlr_frete), 0) AS frete,
         COALESCE(SUM(comissao), 0)  AS comissao
       FROM vincs
@@ -642,18 +701,18 @@ foreach ($ranking as $i => $row) {
 }
 $out['ranking'] = $ranking;
 
-// ---- Top clientes ----
+// ---- Top clientes (ou top grupos, conforme a visão) ----
 $q = "WITH docs AS ({$baseDoc})
       SELECT
-        cnpj_pag AS cnpj,
-        COALESCE(MAX(cliente_nome), MAX(nome_pag), cnpj_pag) AS nome,
+        {$chaveCliente} AS cnpj,
+        {$nomeChaveCli} AS nome,
         COALESCE(MAX(cidade), '') AS cidade,
         COALESCE(MAX(uf), '')     AS uf,
         COUNT(*)::int AS ctes,
         COALESCE(SUM(vlr_frete), 0) AS frete,
         COALESCE(SUM(peso), 0) AS peso
       FROM docs
-      GROUP BY cnpj_pag
+      GROUP BY {$chaveCliente}
       ORDER BY frete DESC
       LIMIT 50";
 $r = sql($q, $params);
@@ -709,22 +768,22 @@ if ($r) {
 }
 $out['por_tp_frete'] = $porTp;
 
-// ---- Pontos do mapa (10 maiores clientes por frete) ----
+// ---- Pontos do mapa (10 maiores clientes/grupos por frete) ----
 // As coordenadas vêm do CT-e quando existirem; caso contrário, devolvemos o
 // endereço de entrega para o front geocodificar via Mapbox (limitado a 10 pontos).
 $q = "WITH docs AS ({$baseDoc}),
       top AS (
-        SELECT cnpj_pag, COUNT(*)::int AS ctes, COALESCE(SUM(vlr_frete), 0) AS frete
+        SELECT {$chaveCliente} AS ck, COUNT(*)::int AS ctes, COALESCE(SUM(vlr_frete), 0) AS frete
         FROM docs
-        GROUP BY cnpj_pag
+        GROUP BY {$chaveCliente}
         ORDER BY frete DESC
         LIMIT 10
       )
       SELECT
-        t.cnpj_pag AS cnpj,
+        t.ck AS cnpj,
         t.ctes,
         t.frete,
-        COALESCE(NULLIF(d.cliente_nome, ''), NULLIF(d.nome_pag, ''), t.cnpj_pag) AS nome,
+        {$nomeRowCli} AS nome,
         COALESCE(d.cidade, '')   AS cidade,
         COALESCE(d.uf, '')       AS uf,
         d.latitude_entrega  AS lat,
@@ -735,7 +794,7 @@ $q = "WITH docs AS ({$baseDoc}),
       FROM top t
       JOIN LATERAL (
         SELECT * FROM docs dd
-        WHERE dd.cnpj_pag = t.cnpj_pag
+        WHERE {$chaveCliente} = t.ck
         ORDER BY dd.data_emissao DESC
         LIMIT 1
       ) d ON TRUE

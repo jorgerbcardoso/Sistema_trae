@@ -262,6 +262,7 @@ interface Parametros {
 }
 interface BiData {
   success: boolean;
+  visao: 'grupos' | 'clientes';
   periodo: { ini: string; fim: string; dias: number; granularidade: 'dia' | 'mes' };
   parametros: Parametros;
   kpis: Kpis;
@@ -614,6 +615,7 @@ export function BIComercial() {
   const [dados, setDados] = useState<BiData | null>(null);
   const [loading, setLoading] = useState(true);
   const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  const [visao, setVisao] = useState<'grupos' | 'clientes'>('grupos');
   const mapaRef = useRef<HTMLDivElement>(null);
 
   // ---------- Drill-down (lista de CT-es) ----------
@@ -648,6 +650,7 @@ export function BIComercial() {
         fim: f.fim,
         login: f.login || '',
         tp_frete: f.tpFrete === 'TODOS' ? '' : f.tpFrete,
+        groupBy: visao,
       });
       const res = await apiFetch(`${API}?${qs.toString()}`);
       if (!res || res.success === false || !res.periodo) {
@@ -660,7 +663,7 @@ export function BIComercial() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [visao]);
 
   useEffect(() => {
     carregar(aplicado);
@@ -707,6 +710,7 @@ export function BIComercial() {
           fim: aplicado.fim,
           login: aplicado.login || '',
           tp_frete: aplicado.tpFrete === 'TODOS' ? '' : aplicado.tpFrete,
+          groupBy: visao,
           f,
           v: v || '',
         });
@@ -723,7 +727,7 @@ export function BIComercial() {
         setDrillLoading(false);
       }
     },
-    [aplicado]
+    [aplicado, visao]
   );
 
   const abrirDrillUf = useCallback(
@@ -957,6 +961,28 @@ export function BIComercial() {
                 </Button>
               ))}
               <div className="flex-1" />
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
+                <button
+                  onClick={() => setVisao('grupos')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    visao === 'grupos'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Grupos
+                </button>
+                <button
+                  onClick={() => setVisao('clientes')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    visao === 'clientes'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Clientes
+                </button>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -1091,7 +1117,7 @@ export function BIComercial() {
                 onClick={() => abrirDrill('geral', '', 'Todos os CT-es do período')}
               />
               <KpiCard
-                titulo="Clientes Ativos"
+                titulo={visao === 'grupos' ? 'Grupos Ativos' : 'Clientes Ativos'}
                 valor={fmtNum(kpis?.clientes_ativos ?? 0)}
                 sub={`de ${fmtNum(kpis?.clientes_carteira ?? 0)} na carteira`}
                 icon={<Users className="w-4 h-4" />}
@@ -1392,7 +1418,7 @@ export function BIComercial() {
               <Card className="border-border/60 shadow-sm">
                 <div className="flex items-center gap-2 px-4 pt-4">
                   <Users className="w-4 h-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground">Top Clientes</h3>
+                  <h3 className="text-sm font-semibold text-foreground">{visao === 'grupos' ? 'Top Grupos' : 'Top Clientes'}</h3>
                 </div>
                 <CardContent className="pt-3">
                   {topClientes.length === 0 ? (
@@ -1405,7 +1431,7 @@ export function BIComercial() {
                           role="button"
                           tabIndex={0}
                           className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 hover:bg-accent/40 cursor-pointer transition-colors"
-                          onClick={() => abrirDrill('cliente', c.cnpj, `Cliente — ${c.nome}`)}
+                          onClick={() => abrirDrill('cliente', c.cnpj, `${visao === 'grupos' ? 'Grupo' : 'Cliente'} — ${c.nome}`)}
                         >
                           <span className="w-5 shrink-0 text-center text-[11px] font-bold text-muted-foreground">
                             {i + 1}

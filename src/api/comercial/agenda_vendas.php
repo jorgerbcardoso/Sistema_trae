@@ -16,11 +16,12 @@
  * GET
  * - (padrão) ?ini=YYYY-MM-DD&fim=YYYY-MM-DD[&login=login1,login2]
  *              → { eu, vendedores, acoes, agenda, periodo }
- * - ?action=clientes&login=xxx → clientes da carteira do vendedor
+ * - ?action=clientes&login=xxx&origem=carteira|fora → clientes disponíveis
  *
  * POST (JSON)
  * - { action: 'criar',     data, login, cnpj, codigo_acao_venda, observacao }
- * - { action: 'atualizar', seq_agenda, codigo_acao_venda, observacao }
+ * - { action: 'atualizar', seq_agenda, data, login, cnpj, codigo_acao_venda, observacao }
+ * - { action: 'transferir_agenda', login_origem, login_destino, ini?, fim? }
  * - { action: 'cumprir',   seq_agenda }
  * ============================================
  */
@@ -339,26 +340,44 @@ function agListar(
     ], JSON_UNESCAPED_UNICODE);
 }
 
-/** Clientes da carteira do vendedor (para escolher no agendamento). */
+/** Lista clientes da carteira ou ainda fora da carteira do vendedor selecionado. */
 function agListarClientes(string $tblVendedorCliente, string $tblCliente, array $STATUS): void {
     $login = trim((string)($_GET['login'] ?? ''));
     if ($login === '') {
         msg('Vendedor não informado', 'error', 400);
     }
 
+    $origem = strtolower(trim((string)($_GET['origem'] ?? 'carteira')));
+    if (!in_array($origem, ['carteira', 'fora'], true)) {
+        msg('Origem dos clientes inválida', 'error', 400);
+    }
+    $foraCarteira = $origem === 'fora';
     $colStatus = agColunaExiste($tblVendedorCliente, 'status') ? 'vc.status' : "''::varchar";
+    $joinVinculo = $foraCarteira
+        ? ''
+        : "INNER JOIN {$tblVendedorCliente} vc
+               ON lower(vc.login) = lower($1)
+              AND " . agCnpjDigitosSql('vc.cnpj') . " = " . agCnpjDigitosSql('c.cnpj');
+    $whereOrigem = $foraCarteira
+        ? "WHERE NOT EXISTS (
+                SELECT 1 FROM {$tblVendedorCliente} vc
+                 WHERE lower(vc.login) = lower($1)
+                   AND " . agCnpjDigitosSql('vc.cnpj') . " = " . agCnpjDigitosSql('c.cnpj') . "
+           )"
+        : '';
+    $selStatus = $foraCarteira ? "''::varchar" : $colStatus;
 
     $query = "
         SELECT
-            c.cnpj,
+            DISTINCT c.cnpj,
             c.nome,
             COALESCE(cid.nome, '') AS cidade,
             COALESCE(cid.uf, '')   AS uf,
-            {$colStatus}           AS status
-        FROM {$tblVendedorCliente} vc
-        INNER JOIN {$tblCliente} c ON c.cnpj = vc.cnpj
+            {$selStatus}           AS status
+        FROM {$tblCliente} c
+        {$joinVinculo}
         LEFT JOIN cidade cid ON cid.seq_cidade = c.seq_cidade
-        WHERE lower(vc.login) = lower($1)
+        {$whereOrigem}
         ORDER BY c.nome
     ";
 
@@ -395,6 +414,7 @@ function agObterLinha(string $tblAgenda, string $tblAcaoVenda, int $seqAgenda): 
     $query = "
         SELECT
             a.seq_agenda,
+            TO_CHAR(a.data, 'YYYY-MM-DD') AS data,
             a.login,
             a.cnpj,
             a.codigo_acao_venda,
@@ -426,6 +446,7 @@ function agCriar(
     string $tblAgenda,
     string $tblVendedor,
     string $tblVendedorCliente,
+    string $tblCliente,
     string $tblAcaoVenda,
     array $data,
     array $eu
@@ -452,15 +473,34 @@ function agCriar(
         msg('Selecione o cliente', 'error', 400);
     }
 
-    // O cliente precisa pertencer à carteira do vendedor.
+    $origemCliente = strtolower(trim((string)($data['origem_cliente'] ?? 'carteira')));
+    if (!in_array($origemCliente, ['carteira', 'fora'], true)) {
+        msg('Selecione a origem do cliente', 'error', 400);
+    }
+
+    $exprCnpjVinculo = agCnpjDigitosSql('cnpj');
     $rc = sql(
         "SELECT 1 FROM {$tblVendedorCliente}
-          WHERE lower(login) = lower($1) AND " . agCnpjDigitosSql('cnpj') . " = $2
+          WHERE lower(login) = lower($1) AND {$exprCnpjVinculo} = $2
           LIMIT 1",
         [$login, $cnpj]
     );
-    if (!$rc || pg_num_rows($rc) === 0) {
+    if (!$rc) {
+        msg('Não foi possível validar a carteira do vendedor', 'error', 500);
+    }
+    if ($origemCliente === 'fora' && pg_num_rows($rc) > 0) {
+        msg('Este cliente pertence à carteira do vendedor. Atualize a seleção e tente novamente.', 'error', 400);
+    }
+    if ($origemCliente === 'carteira' && (!$rc || pg_num_rows($rc) === 0)) {
         msg('Cliente não pertence à carteira do vendedor', 'error', 400);
+    }
+
+    $rCliente = sql(
+        "SELECT 1 FROM {$tblCliente} WHERE " . agCnpjDigitosSql('cnpj') . " = $1 LIMIT 1",
+        [$cnpj]
+    );
+    if (!$rCliente || pg_num_rows($rCliente) === 0) {
+        msg('Cliente não encontrado', 'error', 404);
     }
 
     $codigo = (int)($data['codigo_acao_venda'] ?? 0);
@@ -490,7 +530,14 @@ function agCriar(
     msg('Compromisso agendado com sucesso', 'success', 200, ['seq_agenda' => (int)$row['seq_agenda']]);
 }
 
-function agAtualizar(string $tblAgenda, string $tblAcaoVenda, array $data, array $eu): void {
+function agAtualizar(
+    string $tblAgenda,
+    string $tblVendedor,
+    string $tblCliente,
+    string $tblAcaoVenda,
+    array $data,
+    array $eu
+): void {
     $seq = (int)($data['seq_agenda'] ?? 0);
     if ($seq <= 0) {
         msg('Compromisso não informado', 'error', 400);
@@ -501,6 +548,41 @@ function agAtualizar(string $tblAgenda, string $tblAcaoVenda, array $data, array
         msg('Compromisso não encontrado', 'error', 404);
     }
     agValidarPermissaoLinha($eu, $linha);
+
+    $dia = trim((string)($data['data'] ?? $linha['data'] ?? ''));
+    if (!agDataValida($dia)) {
+        msg('Informe uma data válida', 'error', 400);
+    }
+
+    $login = $eu['is_vendedor']
+        ? (string)$eu['login']
+        : trim((string)($data['login'] ?? $linha['login']));
+    if ($login === '') {
+        msg('Informe o vendedor', 'error', 400);
+    }
+    $rv = sql("SELECT login FROM {$tblVendedor} WHERE lower(login) = lower($1) LIMIT 1", [$login]);
+    if (!$rv || pg_num_rows($rv) === 0) {
+        msg('Vendedor não encontrado', 'error', 404);
+    }
+    $login = (string)pg_fetch_assoc($rv)['login'];
+
+    $cnpj = agDigitos($data['cnpj'] ?? $linha['cnpj']);
+    if ($cnpj === '') {
+        msg('Selecione o cliente', 'error', 400);
+    }
+    $rCliente = sql(
+        "SELECT 1 FROM {$tblCliente} WHERE " . agCnpjDigitosSql('cnpj') . " = $1 LIMIT 1",
+        [$cnpj]
+    );
+    if (!$rCliente || pg_num_rows($rCliente) === 0) {
+        msg('Cliente não encontrado', 'error', 404);
+    }
+
+    $reassign = strcasecmp($login, (string)$linha['login']) !== 0
+        || agDigitos($linha['cnpj']) !== $cnpj;
+    if ($linha['cumprida'] && $reassign) {
+        msg('Compromisso cumprido: não é possível trocar o vendedor ou o cliente', 'error', 409);
+    }
 
     $codigoAtual = (int)$linha['codigo_acao_venda'];
     $codigo = (int)($data['codigo_acao_venda'] ?? 0);
@@ -526,14 +608,114 @@ function agAtualizar(string $tblAgenda, string $tblAcaoVenda, array $data, array
     }
 
     $result = sql(
-        "UPDATE {$tblAgenda} SET codigo_acao_venda = $1, observacao = $2 WHERE seq_agenda = $3",
-        [$codigo, $observacao, $seq]
+        "UPDATE {$tblAgenda}
+            SET data = $1::date, login = $2, cnpj = $3, codigo_acao_venda = $4, observacao = $5
+          WHERE seq_agenda = $6",
+        [$dia, $login, $cnpj, $codigo, $observacao, $seq]
     );
     if (!$result) {
         msg('Erro ao atualizar o compromisso', 'error', 500);
     }
 
     msg('Compromisso atualizado com sucesso', 'success');
+}
+
+/** Transfere os compromissos pendentes entre vendedores, opcionalmente por período. */
+function agTransferirAgenda(
+    string $tblAgenda,
+    string $tblVendedor,
+    array $data,
+    array $eu
+): void {
+    if ($eu['is_vendedor']) {
+        msg('Somente usuários de gestão podem transferir agendas', 'error', 403);
+    }
+
+    $origem = trim((string)($data['login_origem'] ?? ''));
+    $destino = trim((string)($data['login_destino'] ?? ''));
+    if ($origem === '' || $destino === '') {
+        msg('Selecione o vendedor de origem e o de destino', 'error', 400);
+    }
+    if (strcasecmp($origem, $destino) === 0) {
+        msg('Os vendedores de origem e destino devem ser diferentes', 'error', 400);
+    }
+
+    $rVendedores = sql(
+        "SELECT lower(login) AS login_norm, login
+           FROM {$tblVendedor}
+          WHERE lower(login) IN (lower($1), lower($2))",
+        [$origem, $destino]
+    );
+    $loginsValidos = [];
+    while ($rVendedores && ($row = pg_fetch_assoc($rVendedores))) {
+        $loginsValidos[$row['login_norm']] = (string)$row['login'];
+    }
+    if (!isset($loginsValidos[strtolower($origem)]) || !isset($loginsValidos[strtolower($destino)])) {
+        msg('Vendedor de origem ou destino não encontrado', 'error', 404);
+    }
+    $origem = $loginsValidos[strtolower($origem)];
+    $destino = $loginsValidos[strtolower($destino)];
+
+    $ini = trim((string)($data['ini'] ?? ''));
+    $fim = trim((string)($data['fim'] ?? ''));
+    if (($ini !== '' && !agDataValida($ini)) || ($fim !== '' && !agDataValida($fim))) {
+        msg('Informe um período válido', 'error', 400);
+    }
+    if ($ini !== '' && $fim !== '' && $ini > $fim) {
+        msg('A data inicial do período não pode ser posterior à data final', 'error', 400);
+    }
+
+    $where = 'lower(login) = lower($1)';
+    $params = [$origem];
+    if ($ini !== '') {
+        $params[] = $ini;
+        $where .= ' AND data >= $' . count($params) . '::date';
+    }
+    if ($fim !== '') {
+        $params[] = $fim;
+        $where .= ' AND data <= $' . count($params) . '::date';
+    }
+
+    $rCumpridos = sql(
+        "SELECT COUNT(*)::int AS total
+           FROM {$tblAgenda}
+          WHERE {$where} AND COALESCE(cumprida, FALSE) = TRUE",
+        $params
+    );
+    if (!$rCumpridos) {
+        msg('Erro ao consultar os compromissos cumpridos', 'error', 500);
+    }
+    $cumpridos = (int)(pg_fetch_assoc($rCumpridos)['total'] ?? 0);
+
+    $paramsUpdate = [$destino, $origem];
+    $whereUpdate = 'lower(login) = lower($2)';
+    if ($ini !== '') {
+        $paramsUpdate[] = $ini;
+        $whereUpdate .= ' AND data >= $' . count($paramsUpdate) . '::date';
+    }
+    if ($fim !== '') {
+        $paramsUpdate[] = $fim;
+        $whereUpdate .= ' AND data <= $' . count($paramsUpdate) . '::date';
+    }
+    $result = sql(
+        "UPDATE {$tblAgenda}
+            SET login = $1
+          WHERE {$whereUpdate}
+            AND COALESCE(cumprida, FALSE) = FALSE",
+        $paramsUpdate
+    );
+    if (!$result) {
+        msg('Erro ao transferir os compromissos', 'error', 500);
+    }
+
+    $transferidos = pg_affected_rows($result);
+    msg(
+        $transferidos . ' compromisso(s) transferido(s).' .
+            ($cumpridos > 0 ? ' ' . $cumpridos . ' compromisso(s) já cumprido(s) permaneceram com o vendedor original.' : ''),
+        'success',
+        200,
+        ['transferidos' => $transferidos, 'cumpridos_preservados' => $cumpridos]
+    );
 }
 
 /**
@@ -580,7 +762,15 @@ function agCumprir(
         msg('Erro ao atualizar o status do cliente', 'error', 500);
     }
     if (pg_affected_rows($upd) === 0) {
-        msg('Vínculo entre vendedor e cliente não encontrado', 'error', 404);
+        // Clientes prospectados entram na carteira somente quando a ação é cumprida.
+        $ins = sql(
+            "INSERT INTO {$tblVendedorCliente} (login, cnpj, status, data_status)
+             VALUES ($1, $2, $3, CURRENT_DATE)",
+            [(string)$linha['login'], (string)$linha['cnpj'], $status]
+        );
+        if (!$ins) {
+            msg('Erro ao incluir o cliente na carteira do vendedor', 'error', 500);
+        }
     }
 
     $updAg = sql(
@@ -630,9 +820,11 @@ try {
         $postAction = $data['action'] ?? '';
 
         if ($postAction === 'criar') {
-            agCriar($tblAgenda, $tblVendedor, $tblVendedorCliente, $tblAcaoVenda, $data, $eu);
+            agCriar($tblAgenda, $tblVendedor, $tblVendedorCliente, $tblCliente, $tblAcaoVenda, $data, $eu);
         } elseif ($postAction === 'atualizar') {
-            agAtualizar($tblAgenda, $tblAcaoVenda, $data, $eu);
+            agAtualizar($tblAgenda, $tblVendedor, $tblCliente, $tblAcaoVenda, $data, $eu);
+        } elseif ($postAction === 'transferir_agenda') {
+            agTransferirAgenda($tblAgenda, $tblVendedor, $data, $eu);
         } elseif ($postAction === 'cumprir') {
             agCumprir($tblAgenda, $tblVendedorCliente, $tblAcaoVenda, $data, $eu, $STATUS);
         } else {
