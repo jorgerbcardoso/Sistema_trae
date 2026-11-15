@@ -1111,17 +1111,20 @@ export function AgendaVendas() {
                           type="button"
                           onClick={() => setFormCnpj(c.cnpj)}
                           disabled={compromissoCumprido}
+                          title={c.nome}
                           className={cn(
-                            'flex w-full min-w-0 items-center justify-between gap-2 overflow-hidden px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted',
+                            'flex w-full min-w-0 flex-col items-start gap-0.5 overflow-hidden px-2 py-1.5 text-left transition-colors hover:bg-muted',
                             formCnpj.replace(/\D/g, '') === c.cnpj.replace(/\D/g, '') && 'bg-primary/10',
                             compromissoCumprido && 'cursor-not-allowed opacity-60'
                           )}
                         >
-                          <span className="min-w-0 flex-1 truncate font-medium text-foreground">{c.nome}</span>
-                          <span className="min-w-0 max-w-[48%] truncate text-right text-[10px] text-muted-foreground">
-                            {c.cnpj_fmt}
-                            {c.uf ? ` · ${[c.cidade, c.uf].filter(Boolean).join('/')}` : ''}
-                          </span>
+                          <span className="w-full truncate text-xs font-semibold text-foreground">{c.nome}</span>
+                          <span className="w-full truncate text-[10px] text-muted-foreground">{c.cnpj_fmt}</span>
+                          {(c.cidade || c.uf) && (
+                            <span className="w-full truncate text-[10px] text-muted-foreground/75">
+                              {[c.cidade, c.uf].filter(Boolean).join('/')}
+                            </span>
+                          )}
                         </button>
                         ))}
                       </div>
