@@ -10,6 +10,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Trash2,
   X,
 } from 'lucide-react';
 import { AdminLayout } from '../layouts/AdminLayout';
@@ -213,6 +214,7 @@ export function AgendaVendas() {
   const [transferindo, setTransferindo] = useState(false);
 
   const [cumprindo, setCumprindo] = useState<number | null>(null);
+  const [excluindo, setExcluindo] = useState<number | null>(null);
 
   const ehVendedor = !!eu?.is_vendedor;
 
@@ -572,6 +574,33 @@ export function AgendaVendas() {
     }
   };
 
+  const excluir = async (item: AgendaItem) => {
+    const ok = await confirmar({
+      title: 'Excluir compromisso?',
+      description: `Excluir a ação "${item.acao_descricao}" de ${item.cliente_nome || item.cnpj_fmt}? Esta exclusão não pode ser desfeita.${
+        item.cumprida ? ' O status já aplicado ao cliente não será revertido.' : ''
+      }`,
+      confirmText: 'Excluir evento',
+      cancelText: 'Cancelar',
+    });
+    if (!ok) return;
+
+    setExcluindo(item.seq_agenda);
+    try {
+      const resp = await apiFetch(API, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'excluir', seq_agenda: item.seq_agenda }),
+      });
+      if (!resp?.success) return;
+      toast.success(resp.message || 'Compromisso excluído com sucesso.');
+      await carregar();
+    } catch (e) {
+      console.error('Erro ao excluir o compromisso:', e);
+    } finally {
+      setExcluindo(null);
+    }
+  };
+
   const nomeClienteSelecionado = clientes.find(
     (c) => c.cnpj.replace(/\D/g, '') === formCnpj.replace(/\D/g, '')
   );
@@ -923,6 +952,20 @@ export function AgendaVendas() {
                                 className="rounded p-0.5 text-blue-600 hover:bg-blue-500/10 hover:text-blue-700"
                               >
                                 <Pencil className="size-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => excluir(item)}
+                                disabled={excluindo === item.seq_agenda}
+                                title="Excluir evento"
+                                aria-label={`Excluir evento de ${item.cliente_nome || item.cnpj_fmt}`}
+                                className="rounded p-0.5 text-red-600 hover:bg-red-500/10 hover:text-red-700 disabled:opacity-50"
+                              >
+                                {excluindo === item.seq_agenda ? (
+                                  <Loader2 className="size-3 animate-spin" />
+                                ) : (
+                                  <Trash2 className="size-3" />
+                                )}
                               </button>
                               {!item.cumprida && (
                                 <button

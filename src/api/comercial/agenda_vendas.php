@@ -21,6 +21,7 @@
  * POST (JSON)
  * - { action: 'criar',     data, login, cnpj, codigo_acao_venda, observacao }
  * - { action: 'atualizar', seq_agenda, data, login, cnpj, codigo_acao_venda, observacao }
+ * - { action: 'excluir',   seq_agenda }
  * - { action: 'transferir_agenda', login_origem, login_destino, ini?, fim? }
  * - { action: 'cumprir',   seq_agenda }
  * ============================================
@@ -648,6 +649,30 @@ function agAtualizar(
     msg('Compromisso atualizado com sucesso', 'success');
 }
 
+/** Exclui um compromisso respeitando a permissão do vendedor. */
+function agExcluir(string $tblAgenda, string $tblAcaoVenda, array $data, array $eu): void {
+    $seq = (int)($data['seq_agenda'] ?? 0);
+    if ($seq <= 0) {
+        msg('Compromisso não informado', 'error', 400);
+    }
+
+    $linha = agObterLinha($tblAgenda, $tblAcaoVenda, $seq);
+    if ($linha === null) {
+        msg('Compromisso não encontrado', 'error', 404);
+    }
+    agValidarPermissaoLinha($eu, $linha);
+
+    $result = sql("DELETE FROM {$tblAgenda} WHERE seq_agenda = $1", [$seq]);
+    if (!$result) {
+        msg('Erro ao excluir o compromisso', 'error', 500);
+    }
+    if (pg_affected_rows($result) === 0) {
+        msg('Compromisso não encontrado', 'error', 404);
+    }
+
+    msg('Compromisso excluído com sucesso', 'success', 200, ['seq_agenda' => $seq]);
+}
+
 /** Transfere os compromissos pendentes entre vendedores, opcionalmente por período. */
 function agTransferirAgenda(
     string $tblAgenda,
@@ -851,6 +876,8 @@ try {
             agCriar($tblAgenda, $tblVendedor, $tblVendedorCliente, $tblCliente, $tblAcaoVenda, $data, $eu);
         } elseif ($postAction === 'atualizar') {
             agAtualizar($tblAgenda, $tblVendedor, $tblCliente, $tblAcaoVenda, $data, $eu);
+        } elseif ($postAction === 'excluir') {
+            agExcluir($tblAgenda, $tblAcaoVenda, $data, $eu);
         } elseif ($postAction === 'transferir_agenda') {
             agTransferirAgenda($tblAgenda, $tblVendedor, $data, $eu);
         } elseif ($postAction === 'cumprir') {
