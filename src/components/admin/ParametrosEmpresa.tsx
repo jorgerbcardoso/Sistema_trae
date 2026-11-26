@@ -27,6 +27,7 @@ type EmpParam = {
   ocor_chegada_unid_dest: number | null;
   ocor_cte_retido: number | null;
   ocor_estorno_baixa: number | null;
+  ocor_cancelamento: number | null;
   com_vend_desc_pis_cofins: boolean;
   com_vend_desc_icms: boolean;
   com_vend_apenas_liq: boolean;
@@ -41,7 +42,8 @@ type FieldKey =
   | 'ocor_chegada_unid'
   | 'ocor_chegada_unid_dest'
   | 'ocor_cte_retido'
-  | 'ocor_estorno_baixa';
+  | 'ocor_estorno_baixa'
+  | 'ocor_cancelamento';
 
 function formatOcorCodigo(codigo: number) {
   return String(codigo).padStart(2, '0');
@@ -186,6 +188,7 @@ export function ParametrosEmpresa() {
     ocor_chegada_unid_dest: null,
     ocor_cte_retido: null,
     ocor_estorno_baixa: null,
+    ocor_cancelamento: null,
     com_vend_desc_pis_cofins: false,
     com_vend_desc_icms: false,
     com_vend_apenas_liq: false,
@@ -201,6 +204,7 @@ export function ParametrosEmpresa() {
     ocor_chegada_unid_dest: false,
     ocor_cte_retido: false,
     ocor_estorno_baixa: false,
+    ocor_cancelamento: false,
   });
 
   const [searchTerm, setSearchTerm] = useState<Record<FieldKey, string>>({
@@ -212,6 +216,7 @@ export function ParametrosEmpresa() {
     ocor_chegada_unid_dest: '',
     ocor_cte_retido: '',
     ocor_estorno_baixa: '',
+    ocor_cancelamento: '',
   });
 
   const debouncedSearch = {
@@ -223,6 +228,7 @@ export function ParametrosEmpresa() {
     ocor_chegada_unid_dest: useDebouncedValue(searchTerm.ocor_chegada_unid_dest, 250),
     ocor_cte_retido: useDebouncedValue(searchTerm.ocor_cte_retido, 250),
     ocor_estorno_baixa: useDebouncedValue(searchTerm.ocor_estorno_baixa, 250),
+    ocor_cancelamento: useDebouncedValue(searchTerm.ocor_cancelamento, 250),
   };
 
   const [loadingOcor, setLoadingOcor] = useState<Record<FieldKey, boolean>>({
@@ -234,6 +240,7 @@ export function ParametrosEmpresa() {
     ocor_chegada_unid_dest: false,
     ocor_cte_retido: false,
     ocor_estorno_baixa: false,
+    ocor_cancelamento: false,
   });
 
   const [ocorrencias, setOcorrencias] = useState<Record<FieldKey, Ocorrencia[]>>({
@@ -245,6 +252,7 @@ export function ParametrosEmpresa() {
     ocor_chegada_unid_dest: [],
     ocor_cte_retido: [],
     ocor_estorno_baixa: [],
+    ocor_cancelamento: [],
   });
 
   const occurrenceMap = useMemo(() => {
@@ -278,6 +286,7 @@ export function ParametrosEmpresa() {
         'ocor_chegada_unid_dest',
         'ocor_cte_retido',
         'ocor_estorno_baixa',
+        'ocor_cancelamento',
       ];
       await Promise.all(
         fields
@@ -324,6 +333,7 @@ export function ParametrosEmpresa() {
       'ocor_chegada_unid_dest',
       'ocor_cte_retido',
       'ocor_estorno_baixa',
+      'ocor_cancelamento',
     ];
     fields.forEach((field) => {
       if (ocorrenciasOpen[field]) {
@@ -340,6 +350,7 @@ export function ParametrosEmpresa() {
     debouncedSearch.ocor_chegada_unid_dest,
     debouncedSearch.ocor_cte_retido,
     debouncedSearch.ocor_estorno_baixa,
+    debouncedSearch.ocor_cancelamento,
   ]);
 
   const save = async () => {
@@ -377,7 +388,7 @@ export function ParametrosEmpresa() {
         <Card>
           <CardHeader>
             <CardTitle>Ocorrências</CardTitle>
-            <CardDescription>Defina os códigos de ocorrência usados pelos painéis de agendamento.</CardDescription>
+            <CardDescription>Defina os códigos de ocorrência usados pelos painéis e pelo tratamento de CT-es cancelados.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <OcorrenciaPicker
@@ -527,6 +538,25 @@ export function ParametrosEmpresa() {
               selectedLabel={
                 params.ocor_estorno_baixa != null
                   ? `${formatOcorCodigo(params.ocor_estorno_baixa)}. ${occurrenceMap.get(params.ocor_estorno_baixa)?.descricao ?? ''}`.trim()
+                  : 'Selecionar ocorrência'
+              }
+              onSelect={handleSelect}
+              onClear={handleClear}
+            />
+            <OcorrenciaPicker
+              field="ocor_cancelamento"
+              label="Cancelamento de CT-e"
+              placeholder="Busque por código ou descrição..."
+              open={ocorrenciasOpen.ocor_cancelamento}
+              setOpen={setOpen}
+              searchValue={searchTerm.ocor_cancelamento}
+              setSearchValue={setSearchValue}
+              list={ocorrencias.ocor_cancelamento}
+              isLoadingList={loadingOcor.ocor_cancelamento}
+              selectedCode={params.ocor_cancelamento}
+              selectedLabel={
+                params.ocor_cancelamento != null
+                  ? `${formatOcorCodigo(params.ocor_cancelamento)}. ${occurrenceMap.get(params.ocor_cancelamento)?.descricao ?? ''}`.trim()
                   : 'Selecionar ocorrência'
               }
               onSelect={handleSelect}
