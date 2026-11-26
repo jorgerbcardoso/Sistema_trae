@@ -7065,14 +7065,16 @@ function ModalRotaCarregamento({
       );
       if (!resp.ok) {
         const txt = await resp.text();
-        try { throw new Error(JSON.parse(txt).message || 'Erro ao exportar'); }
-        catch { throw new Error('Erro ao exportar planilha'); }
+        let message = 'Erro ao exportar planilha';
+        try { message = String(JSON.parse(txt)?.message || message); } catch {}
+        throw new Error(message);
       }
       const contentType = resp.headers.get('content-type') || '';
       if (!contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
         const txt = await resp.text();
-        try { throw new Error(JSON.parse(txt).message || 'Erro ao exportar'); }
-        catch { throw new Error('Erro ao exportar planilha'); }
+        let message = 'Erro ao exportar planilha';
+        try { message = String(JSON.parse(txt)?.message || message); } catch {}
+        throw new Error(message);
       }
 
       const blob = await resp.blob();
@@ -7192,6 +7194,8 @@ function ModalRotaCarregamento({
         throw new Error('Nenhum destino encontrado para gerar as planilhas.');
       }
 
+      // Com um único destino, a ordem deve ser idêntica à exportação única.
+      const filtrarPorDestino = destinos.length > 1;
       const rotaTxt = unidadesOrdem.filter(Boolean).join(' → ');
       const mapImage = await (async () => {
         try {
@@ -7289,19 +7293,30 @@ function ModalRotaCarregamento({
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ unidade: origem, placa: carregamento.placa_provisoria, seq_carregamento: carregamento.seq_carregamento ?? null, rota: rotaTxt, rota_km: routeDistanceKm, linhas, map_image: mapImage, destino }),
+            body: JSON.stringify({
+              unidade: origem,
+              placa: carregamento.placa_provisoria,
+              seq_carregamento: carregamento.seq_carregamento ?? null,
+              rota: rotaTxt,
+              rota_km: routeDistanceKm,
+              linhas,
+              map_image: mapImage,
+              ...(filtrarPorDestino ? { destino } : {}),
+            }),
           }
         );
         if (!resp.ok) {
           const txt = await resp.text();
-          try { throw new Error(JSON.parse(txt).message || 'Erro ao exportar'); }
-          catch { throw new Error('Erro ao exportar planilha'); }
+          let message = 'Erro ao exportar planilha';
+          try { message = String(JSON.parse(txt)?.message || message); } catch {}
+          throw new Error(message);
         }
         const contentType = resp.headers.get('content-type') || '';
         if (!contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
           const txt = await resp.text();
-          try { throw new Error(JSON.parse(txt).message || 'Erro ao exportar'); }
-          catch { throw new Error('Erro ao exportar planilha'); }
+          let message = 'Erro ao exportar planilha';
+          try { message = String(JSON.parse(txt)?.message || message); } catch {}
+          throw new Error(message);
         }
 
         const blob = await resp.blob();
@@ -7309,13 +7324,14 @@ function ModalRotaCarregamento({
         const a = document.createElement('a');
         const destSafe = String(destino).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 24);
         a.href = url;
-        a.download = `${baseName}${destSafe ? `_${destSafe}` : ''}.xlsx`;
+        a.download = `${baseName}${filtrarPorDestino && destSafe ? `_${destSafe}` : ''}.xlsx`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
       }
-      toast.success(`Planilhas geradas: ${destinos.length}`);
+      if (destinos.length === 1) toast.success('Planilha gerada com sucesso!');
+      else toast.success(`Planilhas geradas: ${destinos.length}`);
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao gerar planilha.');
     } finally {

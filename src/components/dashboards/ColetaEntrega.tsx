@@ -16,7 +16,7 @@ import { ENVIRONMENT } from '../../config/environment';
 import { toast } from 'sonner';
 import {
   PieChart, Pie, Cell, LineChart, Line, Area, AreaChart,
-  XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip,
+  XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, LabelList,
   Legend, ResponsiveContainer, BarChart, Bar,
 } from 'recharts';
 import {
@@ -211,6 +211,43 @@ function YAxisTickEllipsis({ x, y, payload }: { x?: number; y?: number; payload?
         {label}
       </text>
     </g>
+  );
+}
+
+// Tooltip dos gráficos "frete x remuneração": mostra o frete total da barra,
+// a remuneração destacada e o quanto ela representa do frete.
+function TooltipFreteRemuneracao({ active, payload, label }: any) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = (payload[0]?.payload ?? {}) as { frete?: number; remuneracao?: number };
+  const frete = Number(row.frete ?? 0) || 0;
+  const remuneracao = Number(row.remuneracao ?? 0) || 0;
+  const pct = frete > 0 ? remuneracao / frete : 0;
+  return (
+    <div className="rounded-md border border-slate-600 bg-slate-800 px-2.5 py-1.5 text-xs text-slate-100 shadow-lg">
+      <div className="mb-0.5 font-semibold">{String(label ?? '')}</div>
+      <div>Frete: {formatMoeda(frete)}</div>
+      <div className="text-rose-300">Remuneração: {formatMoeda(remuneracao)}</div>
+      <div className="text-slate-400">Representatividade: {formatPercent1(pct)}</div>
+    </div>
+  );
+}
+
+// Rótulo com a representatividade (%) posicionado no fim da barra empilhada.
+function BarPctLabel(props: any) {
+  const { x, y, width, height, value } = props ?? {};
+  const pct = Number(value ?? 0) || 0;
+  if (pct <= 0) return null;
+  return (
+    <text
+      x={Number(x) + Number(width) + 4}
+      y={Number(y) + Number(height) / 2}
+      dy={3}
+      textAnchor="start"
+      fontSize={10}
+      fill="#fda4af"
+    >
+      {formatPercent1(pct)}
+    </text>
   );
 }
 
@@ -964,7 +1001,17 @@ export function ColetaEntrega() {
   const topPlacasFrete = [...grupos]
     .sort((a, b) => b.frete - a.frete)
     .slice(0, 8)
-    .map(g => ({ placa: g.placa, frete: g.frete }));
+    .map(g => {
+      const frete = Number(g.frete ?? 0) || 0;
+      const remuneracao = Number(g.remuneracao ?? 0) || 0;
+      return {
+        placa: g.placa,
+        frete,
+        remuneracao,
+        freteRestante: Math.max(0, frete - remuneracao),
+        remuneracaoPct: frete > 0 ? remuneracao / frete : 0,
+      };
+    });
 
   const topPlacasRemuneracao = [...gruposTerceiros]
     .sort((a, b) => (Number(b.remuneracao ?? 0) || 0) - (Number(a.remuneracao ?? 0) || 0))
@@ -977,17 +1024,22 @@ export function ColetaEntrega() {
     { name: 'Frete (restante)', value: Math.max(0, totaisTerceiros.frete - totaisTerceiros.remuneracao) },
   ];
 
-  const topProprietariosEntregas = Object.values(
+  const topProprietariosFrete = Object.values(
     grupos.reduce((acc, g) => {
       const k = String(g.proprietarioNome ?? '').trim() || '(Sem proprietário)';
-      if (!acc[k]) acc[k] = { proprietario: k, entregas: 0, frete: 0 };
-      acc[k].entregas += g.entregas;
-      acc[k].frete += g.frete;
+      if (!acc[k]) acc[k] = { proprietario: k, frete: 0, remuneracao: 0 };
+      acc[k].frete += Number(g.frete ?? 0) || 0;
+      acc[k].remuneracao += Number(g.remuneracao ?? 0) || 0;
       return acc;
-    }, {} as Record<string, { proprietario: string; entregas: number; frete: number }>)
+    }, {} as Record<string, { proprietario: string; frete: number; remuneracao: number }>)
   )
-    .sort((a, b) => b.entregas - a.entregas)
-    .slice(0, 8);
+    .sort((a, b) => b.frete - a.frete)
+    .slice(0, 8)
+    .map(r => ({
+      ...r,
+      freteRestante: Math.max(0, r.frete - r.remuneracao),
+      remuneracaoPct: r.frete > 0 ? r.remuneracao / r.frete : 0,
+    }));
 
   const topProprietariosRemuneracao = Object.values(
     gruposTerceiros.reduce((acc, g) => {
@@ -1547,24 +1599,35 @@ export function ColetaEntrega() {
 
           <Card className="dark:bg-slate-900/90 dark:border-slate-700">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 8 proprietários — entregas</CardTitle>
+              <CardTitle className="text-sm text-slate-700 dark:text-slate-300">Top 8 proprietários — frete</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={topProprietariosEntregas} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
+                <BarChart data={topProprietariosFrete} layout="vertical" margin={{ top: 0, right: 44, left: 10, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="gradPropEnt" x1="0" y1="0" x2="1" y2="0">
+                    <linearGradient id="gradPropFrete" x1="0" y1="0" x2="1" y2="0">
                       <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.7} />
                       <stop offset="100%" stopColor="#06b6d4" stopOpacity={1} />
                     </linearGradient>
+                    <linearGradient id="gradPropRemuSeg" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#fb7185" stopOpacity={0.8} />
+                      <stop offset="100%" stopColor="#f43f5e" stopOpacity={1} />
+                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
-                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v) / 1000).toFixed(0)}k` : ''} />
                   <YAxis type="category" dataKey="proprietario" tick={<YAxisTickEllipsis />} width={140} interval={0} tickMargin={6} />
-                  <RechartTooltip formatter={(v: number) => [v, 'Entregas']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="entregas" fill="url(#gradPropEnt)" radius={[0, 6, 6, 0]} />
+                  <RechartTooltip content={<TooltipFreteRemuneracao />} />
+                  <Bar dataKey="remuneracao" stackId="freteProp" name="Remuneração" fill="url(#gradPropRemuSeg)" />
+                  <Bar dataKey="freteRestante" stackId="freteProp" name="Frete (restante)" fill="url(#gradPropFrete)" radius={[0, 6, 6, 0]}>
+                    <LabelList dataKey="remuneracaoPct" content={BarPctLabel} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              <div className="mt-2 flex items-center justify-center gap-4 text-[10px] text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-sm bg-rose-500" />Remuneração</span>
+                <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-sm bg-cyan-500" />Frete</span>
+              </div>
             </CardContent>
           </Card>
 
@@ -1574,20 +1637,31 @@ export function ColetaEntrega() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={topPlacasFrete} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
+                <BarChart data={topPlacasFrete} layout="vertical" margin={{ top: 0, right: 44, left: 10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradPlacaFrete" x1="0" y1="0" x2="1" y2="0">
                       <stop offset="0%" stopColor="#10b981" stopOpacity={0.7} />
                       <stop offset="100%" stopColor="#06b6d4" stopOpacity={1} />
                     </linearGradient>
+                    <linearGradient id="gradPlacaRemuSeg" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#fb7185" stopOpacity={0.8} />
+                      <stop offset="100%" stopColor="#f43f5e" stopOpacity={1} />
+                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                   <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v != null ? `R$${(Number(v) / 1000).toFixed(0)}k` : ''} />
                   <YAxis type="category" dataKey="placa" tick={{ fontSize: 10, fill: '#94a3b8' }} width={65} />
-                  <RechartTooltip formatter={(v: number) => [formatMoeda(v), 'Frete']} contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="frete" fill="url(#gradPlacaFrete)" radius={[0, 6, 6, 0]} />
+                  <RechartTooltip content={<TooltipFreteRemuneracao />} />
+                  <Bar dataKey="remuneracao" stackId="fretePlaca" name="Remuneração" fill="url(#gradPlacaRemuSeg)" />
+                  <Bar dataKey="freteRestante" stackId="fretePlaca" name="Frete (restante)" fill="url(#gradPlacaFrete)" radius={[0, 6, 6, 0]}>
+                    <LabelList dataKey="remuneracaoPct" content={BarPctLabel} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              <div className="mt-2 flex items-center justify-center gap-4 text-[10px] text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-sm bg-rose-500" />Remuneração</span>
+                <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-sm bg-cyan-500" />Frete</span>
+              </div>
             </CardContent>
           </Card>
 

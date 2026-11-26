@@ -61,6 +61,7 @@ $tblCte = "{$domain}_cte";
 $tblEmpParam = "{$domain}_emp_param";
 $tblCap = "{$domain}_carregamento_capacidade";
 $tblMot = "{$domain}_motorista";
+$tblFreteDisp = "{$domain}_frete_disponivel";
 
 @pg_query($conn, "ALTER TABLE {$tblCar} ADD COLUMN IF NOT EXISTS ordem INT");
 @pg_query($conn, "ALTER TABLE {$tblCar} ADD COLUMN IF NOT EXISTS setor_cte VARCHAR(30)");
@@ -241,10 +242,14 @@ try {
             COALESCE(cte.peso_calc, 0) AS peso_calc,
             COALESCE(cte.cubagem, car.cubagem_cte, 0) AS cubagem,
             COALESCE(cte.qtde_vol, car.qtde_vol_cte, 0) AS qtde_vol,
+            COALESCE(car.vlr_frete_cte, 0) * (COALESCE(fd.percentual, 100)::numeric / 100.0) AS frete_disponivel,
             COALESCE(cte.cep_entrega::text, '') AS cep_entrega,
             COALESCE(cte.endereco_entrega, '') AS endereco_entrega,
             COALESCE(cte.bairro_entrega, '') AS bairro_entrega
         FROM {$tblCar} car
+        LEFT JOIN {$tblFreteDisp} fd
+               ON fd.sigla_emit = car.ser_cte
+              AND fd.sigla_carregamento = $1
         LEFT JOIN {$tblCte} cte
                ON cte.ser_cte = car.ser_cte
               AND cte.nro_cte = car.nro_cte
@@ -312,6 +317,7 @@ try {
             'kg_calc' => (float)($r['peso_calc'] ?? 0),
             'cubagem' => (float)($r['cubagem'] ?? 0),
             'qtde_vol' => (int)($r['qtde_vol'] ?? 0),
+            'frete_disponivel' => (float)($r['frete_disponivel'] ?? 0),
             'obs' => '',
         ];
     }
@@ -327,13 +333,24 @@ $destinoFiltro = strtoupper(trim((string)($input['destino'] ?? '')));
 if ($destinoFiltro !== '') {
     $linTmpFil = is_array($linhas) ? $linhas : [];
     $linTmpFil = array_values(array_filter($linTmpFil, function($it) use ($destinoFiltro) {
-        $s = strtoupper(trim((string)($it['setor'] ?? $it['destino_cte'] ?? '')));
-        return $s !== '' && $s === $destinoFiltro;
+        $setor = strtoupper(trim((string)($it['setor'] ?? '')));
+        $destinoCte = strtoupper(trim((string)($it['destino_cte'] ?? '')));
+        $candidatos = array_filter(array_merge(
+            [$setor, $destinoCte],
+            preg_split('/\s*,\s*/', $setor) ?: [],
+            preg_split('/\s*,\s*/', $destinoCte) ?: []
+        ), function($v) { return trim((string)$v) !== ''; });
+        return in_array($destinoFiltro, $candidatos, true);
     }));
     if (count($linTmpFil) === 0) {
         respondJson(['success' => false, 'message' => 'Nenhuma linha encontrada para o destino informado.'], 400);
     }
     $linhas = $linTmpFil;
+}
+
+$freteDisponivelTotal = 0.0;
+foreach ((array)$linhas as $it) {
+    if (is_array($it)) $freteDisponivelTotal += (float)($it['frete_disponivel'] ?? 0);
 }
 
 $destinosTxt = '';
@@ -826,12 +843,22 @@ $sheet->getStyle('I24')->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_N
 
 $sheet->getStyle('A22:L24')->applyFromArray($styleGrid);
 
-$sheet->mergeCells('A25:L25');
-$sheet->setCellValue('A25', 'NOTAS FISCAIS / ITENS CARREGADOS');
-$sheet->getStyle('A25:L25')->applyFromArray($styleDarkBar);
+$sheet->mergeCells('A25:D25');
+$sheet->mergeCells('E25:L25');
+$sheet->setCellValue('A25', 'FRETE DISPONÍVEL (R$)');
+$sheet->setCellValue('E25', $freteDisponivelTotal);
+$sheet->getStyle('A25:D25')->applyFromArray($styleLabel);
+$sheet->getStyle('E25:L25')->applyFromArray($styleValue);
+$sheet->getStyle('E25:L25')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+$sheet->getStyle('A25:L25')->applyFromArray($styleGrid);
+$sheet->getStyle('E25')->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
 
-$headerRow = 26;
-$dataRowStart = 27;
+$sheet->mergeCells('A26:L26');
+$sheet->setCellValue('A26', 'NOTAS FISCAIS / ITENS CARREGADOS');
+$sheet->getStyle('A26:L26')->applyFromArray($styleDarkBar);
+
+$headerRow = 27;
+$dataRowStart = 28;
 $dataRowsCount = max(count($linhas), 1);
 $totalRow = $dataRowStart + $dataRowsCount;
 $maxTableRows = max($dataRowsCount + 1 + 8, 20);

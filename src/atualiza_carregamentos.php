@@ -10,8 +10,14 @@
  *
  * Importante:
  * - Reprocessa todas as cargas abertas e as finalizadas nos últimos 7 dias.
- * - O período do SSW0125 (PER) é calculado por unidade, usando a inclusão mais antiga e
- *   a mais recente do universo da unidade (mais 2 dias, limitado a hoje).
+ * - Quando NENHUM período é informado ($argv[3]/$argv[4] ausentes), o SSW0125 (PER)
+ *   é consultado sempre com os ÚLTIMOS 2 DIAS até hoje, garantindo que manifestos
+ *   recentes sem carregamento no Presto sejam criados.
+ * - Quando $argv[3]/$argv[4] são informados (formato dmy), têm PRIORIDADE e são
+ *   usados em todas as unidades (ideal para backfill histórico).
+ * - Processa TODAS as unidades cadastradas em {dominio}_unidade (filtrando por
+ *   efetua_carregamento = true quando a coluna existir), não apenas as que já
+ *   possuem carregamentos.
  *
  * Regra de escopo:
  * - Vale apenas para carregamentos de Transferência (tp_carregamento = 'T')
@@ -26,9 +32,6 @@
  *   - No domínio RVE a placa Presto é fictícia e combina apenas os 4 últimos
  *     caracteres com a placa real do veículo; cargas com o mesmo sufixo são
  *     combinadas no mesmo cenário de saída.
- *   - Agrupamentos da PER (placa + saída f11) dos últimos 2 dias que não possuem
- *     carregamento correspondente no Presto são criados a partir dos manifestos
- *     (f18). Nunca cria carga sem CT-es.
  *
  * Execução via crontab (exemplo):
  *   0 * * * * php /var/www/html/src/atualiza_carregamentos.php >> /var/www/html/tmp/atualiza_carregamentos.log 2>&1
@@ -36,6 +39,14 @@
  * Argumentos:
  *   $argv[1] (opcional) = DOMINIO (ex.: RVE). Se omitido, roda em todos os domínios ativos.
  *   $argv[2] (opcional) = UNIDADE (ex.: SSA). Se omitido, roda em todas as unidades encontradas no universo.
+ *   $argv[3] (opcional) = DATA INICIAL no formato dmy (ex.: 011126 para 01/11/2026).
+ *   $argv[4] (opcional) = DATA FINAL   no formato dmy (ex.: 251126 para 25/11/2026).
+ *                          Quando informadas, estas datas têm PRIORIDADE sobre o período
+ *                          calculado automaticamente por unidade e são usadas em todas as unidades.
+ *
+ * Além de finalizar os carregamentos existentes, o script também cria carregamentos
+ * FINALIZADOS a partir de manifestos do SSW0125 que não possuem ligação com nenhum
+ * carregamento já existente no Presto.
  * ================================================================
  */
 require_once '/var/www/html/lib/presto.php';
@@ -67,6 +78,34 @@ function chave_match_sync_carregamento(string $placa, string $dominio): string {
     return $limpa;
 }
 
+/**
+ * Resolve a placa_provisoria a ser gravada para uma chave de casamento.
+ * No RVE a chave é o sufixo de 4 caracteres; grava-se a placa real do veículo
+ * (mesma convenção do importador do painel), evitando carregamentos duplicados.
+ */
+function resolver_placa_para_chave($conn, string $domain, string $chave): string {
+    $chave = strtoupper(trim((string)$chave));
+    if ($chave === '') return '';
+    if (strtoupper($domain) !== 'RVE') return $chave;
+
+    $tblVeic = strtolower($domain) . '_veiculo';
+    if (!pg_table_exists($conn, $tblVeic)) return $chave;
+    $res = @pg_query_params(
+        $conn,
+        "SELECT placa FROM {$tblVeic}
+         WHERE RIGHT(UPPER(BTRIM(placa)), 4) = $1
+           AND UPPER(BTRIM(COALESCE(tipo, ''))) <> 'CAVALO'
+         ORDER BY LENGTH(BTRIM(placa)) ASC, UPPER(BTRIM(placa)) ASC
+         LIMIT 1",
+        [$chave]
+    );
+    if ($res && @pg_num_rows($res) > 0) {
+        $placa = normalizar_placa_sync_carregamento((string)@pg_fetch_result($res, 0, 0));
+        if ($placa !== '') return $placa;
+    }
+    return $chave;
+}
+
 function dmyDate(?DateTime $dt): string {
     return $dt ? $dt->format('dmy') : '';
 }
@@ -76,6 +115,26 @@ function clampDmyRange(DateTime $ini, DateTime $fim): array {
     if ($fim->getTimestamp() > $today->getTimestamp()) $fim = $today;
     if ($fim->getTimestamp() < $ini->getTimestamp()) $fim = clone $ini;
     return [$ini, $fim];
+}
+
+/**
+ * Converte uma string no formato dmy (ex.: "011126" => 01/11/2026) em DateTime.
+ * Aceita também 8 dígitos (dmy com ano de 4 dígitos). Retorna null se inválido.
+ */
+function parse_dmy_arg(?string $v): ?DateTime {
+    $s = trim((string)$v);
+    if ($s === '') return null;
+    $s = preg_replace('/[^0-9]/', '', $s);
+    if (strlen($s) === 6) {
+        $dt = DateTime::createFromFormat('dmy', $s);
+    } elseif (strlen($s) === 8) {
+        $dt = DateTime::createFromFormat('dmY', $s);
+    } else {
+        return null;
+    }
+    if ($dt === false) return null;
+    $dt->setTime(0, 0, 0);
+    return $dt;
 }
 
 function extract_xml_fragment(string $html): ?string {
@@ -212,11 +271,6 @@ function ssw_per_por_periodo(string $dominio, string $unidade, DateTime $ini, Da
 
             $f3 = strtoupper(trim((string)($r->f3 ?? '')));
             $f2 = strtoupper(trim((string)($r->f2 ?? '')));
-            // Placas reais exatamente como vêm do ssw0125 (para gravar na criação).
-            $placasReais = array_values(array_unique(array_filter([
-                normalizar_placa_sync_carregamento($f2),
-                normalizar_placa_sync_carregamento($f3),
-            ])));
             // No RVE a placa real do ssw0125 casa com a placa fictícia do Presto
             // apenas pelos 4 últimos caracteres (chave de casamento).
             $placas = array_values(array_unique(array_filter([
@@ -242,11 +296,7 @@ function ssw_per_por_periodo(string $dominio, string $unidade, DateTime $ini, Da
                         'saida' => $dt,
                         'qtd' => 0,
                         'manifestos' => [],
-                        'placas' => [],
                     ];
-                }
-                foreach ($placasReais as $pr) {
-                    if ($pr !== '') $viagensPorPlaca[$placa][$ts]['placas'][$pr] = true;
                 }
                 if ($f8Num > 0) $viagensPorPlaca[$placa][$ts]['qtd'] += $f8Num;
                 if ($seqMan !== '') $viagensPorPlaca[$placa][$ts]['manifestos'][$seqMan] = true;
@@ -474,37 +524,11 @@ function restore_zerado($conn, string $domain, string $unidade, string $login, a
     $dataSaida = $dtSaida->format('Y-m-d');
     $horaSaida = $dtSaida->format('H:i:s');
 
-    // Data/hora de inclusão dos CT-es restaurados.
-    // REGRA CRÍTICA: a inclusão de um carregamento é o seu INÍCIO (primeira
-    // leitura/bipagem — ssw0194), e corresponde ao MIN(data_inclusao) das suas
-    // linhas. Para um carregamento JÁ EXISTENTE essa data nunca pode mudar, por
-    // isso os CT-es restaurados herdam o MIN(data_inclusao) já gravado na carga
-    // (mesma regra do importador oficial). Somente numa carga nova (sem linhas)
-    // usa-se a data/hora da saída. Nunca se usa CURRENT_DATE para sobrescrever.
-    $anchorInc = null;
-    $resAnchor = @pg_query_params(
-        $conn,
-        "SELECT MIN((data_inclusao::timestamp + hora_inclusao::time)) AS anchor
-         FROM {$tabela}
-         WHERE unidade = $1 AND seq_carregamento = $2",
-        [$unidade, $seqCarreg]
-    );
-    if ($resAnchor && pg_num_rows($resAnchor) > 0) {
-        $anchorVal = pg_fetch_result($resAnchor, 0, 0);
-        if ($anchorVal !== null && $anchorVal !== '') {
-            try { $anchorInc = new DateTime((string)$anchorVal); } catch (Exception $e) { $anchorInc = null; }
-        }
-    }
-
-    $dataIncSql = 'CURRENT_DATE';
-    $horaIncSql = 'CURRENT_TIME';
-    if ($anchorInc instanceof DateTime) {
-        $dataIncSql = "'" . $anchorInc->format('Y-m-d') . "'::date";
-        $horaIncSql = "'" . $anchorInc->format('H:i:s') . "'::time";
-    } elseif ($dtInclusao instanceof DateTime) {
-        $dataIncSql = "'" . $dtInclusao->format('Y-m-d') . "'::date";
-        $horaIncSql = "'" . $dtInclusao->format('H:i:s') . "'::time";
-    }
+    // Data/hora de inclusão: quando informada (ex.: criação a partir de
+    // manifestos do SSW) usa a data do SSW; senão usa o momento atual.
+    $dtInc = $dtInclusao instanceof DateTime ? $dtInclusao : new DateTime();
+    $dataIncSql = "'" . pg_escape_string($conn, $dtInc->format('Y-m-d')) . "'::date";
+    $horaIncSql = "'" . pg_escape_string($conn, $dtInc->format('H:i:s')) . "'::time";
 
     $destinoCarreg = (string)($car['destino'] ?? '');
     $unidadesCarreg = (string)($car['unidades'] ?? '');
@@ -592,45 +616,73 @@ function restore_zerado($conn, string $domain, string $unidade, string $login, a
 }
 
 /**
- * Cria um carregamento novo no Presto a partir de um agrupamento (placa + saída)
- * do ssw0125 que não possui carregamento correspondente: gera o seq, cria o
- * cabeçalho em _carregamento_capacidade e insere os CT-es dos manifestos.
- * Se os manifestos não tiverem CT-es, desfaz o cabeçalho (não cria carga vazia).
+ * Garante a existência da sequence de seq_carregamento e devolve o próximo valor.
  */
-function criar_carregamento_ssw($conn, string $domain, string $unidade, string $login, string $placa, string $seqName, array $manifestos, DateTime $dtSaida): array {
+function proximo_seq_carregamento($conn, string $domain): int {
+    $seqName = strtolower($domain) . '_seq_carregamento_seq';
+    @pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
+    $res = @pg_query($conn, "SELECT nextval('" . pg_escape_string($conn, $seqName) . "') AS seq");
+    if (!$res || @pg_num_rows($res) === 0) return 0;
+    return (int)@pg_fetch_result($res, 0, 0);
+}
+
+/**
+ * Cria um carregamento FINALIZADO a partir de um agrupamento de manifestos do
+ * SSW0125 que não foi ligado a nenhum carregamento existente. O carregamento
+ * nasce com data_finalizacao = data/hora de saída (f11).
+ *
+ * @return array ['success','added','seq','message']
+ */
+function criar_carregamento_de_manifestos(
+    $conn,
+    string $domain,
+    string $unidade,
+    string $login,
+    string $placa,
+    array $manifestos,
+    DateTime $dtSaida
+): array {
+    $placa = strtoupper(trim((string)$placa));
+    $unidade = strtoupper(trim((string)$unidade));
+    if ($placa === '' || $unidade === '' || count($manifestos) === 0) {
+        return ['success' => false, 'added' => 0, 'seq' => 0, 'message' => 'Dados insuficientes para criar o carregamento.'];
+    }
+
     $tabela = "{$domain}_carregamento";
     $tabelaCap = "{$domain}_carregamento_capacidade";
-    $placa = strtoupper(trim($placa));
-    if ($placa === '' || count($manifestos) === 0) {
-        return ['success' => false, 'added' => 0, 'message' => 'Dados insuficientes para criar o carregamento.'];
+
+    // Garante colunas e sequence (idempotente).
+    @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS origem_criacao VARCHAR(20)");
+    @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS data_finalizacao DATE");
+    @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS hora_finalizacao TIME");
+    @pg_query($conn, "ALTER TABLE {$tabela} ADD COLUMN IF NOT EXISTS login_finalizacao VARCHAR(60)");
+    @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS simulado BOOLEAN DEFAULT FALSE");
+    @pg_query($conn, "ALTER TABLE {$tabelaCap} ADD COLUMN IF NOT EXISTS tp_carregamento VARCHAR(1)");
+
+    $seqCarreg = proximo_seq_carregamento($conn, $domain);
+    if ($seqCarreg <= 0) {
+        return ['success' => false, 'added' => 0, 'seq' => 0, 'message' => 'Falha ao obter seq_carregamento.'];
     }
 
-    @pg_query($conn, "CREATE SEQUENCE IF NOT EXISTS {$seqName}");
-    $resSeq = @pg_query($conn, "SELECT nextval('" . pg_escape_string($conn, $seqName) . "') AS seq");
-    if (!$resSeq || pg_num_rows($resSeq) === 0) {
-        return ['success' => false, 'added' => 0, 'message' => 'Falha ao gerar seq_carregamento.'];
-    }
-    $seq = (int)pg_fetch_result($resSeq, 0, 0);
-    if ($seq <= 0) return ['success' => false, 'added' => 0, 'message' => 'seq_carregamento inválido.'];
+    $placaEsc = pg_escape_string($conn, $placa);
+    $unidadeEsc = pg_escape_string($conn, $unidade);
 
-    $resCap = @pg_query_params(
+    // Cabeçalho do carregamento (capacidade) — transferência, não simulado.
+    $resCap = @pg_query(
         $conn,
-        "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, nro_linha, tp_carregamento, simulado)
-         VALUES ($1, $2, $3, 0, 'T', FALSE)
-         ON CONFLICT (unidade, seq_carregamento) DO NOTHING",
-        [$unidade, $seq, $placa]
+        "INSERT INTO {$tabelaCap} (unidade, seq_carregamento, placa_provisoria, simulado, tp_carregamento)
+         VALUES ('{$unidadeEsc}', {$seqCarreg}, '{$placaEsc}', FALSE, 'T')
+         ON CONFLICT (unidade, seq_carregamento) DO UPDATE
+            SET placa_provisoria = EXCLUDED.placa_provisoria,
+                simulado = FALSE,
+                tp_carregamento = COALESCE({$tabelaCap}.tp_carregamento, 'T')"
     );
     if (!$resCap) {
-        return ['success' => false, 'added' => 0, 'message' => 'Falha ao criar o cabeçalho do carregamento.'];
-    }
-    // Se nada foi inserido, o seq já existia em outra carga: abortar para não
-    // misturar CT-es de um carregamento existente.
-    if (pg_affected_rows($resCap) <= 0) {
-        return ['success' => false, 'added' => 0, 'seq' => $seq, 'message' => 'seq_carregamento já existente; criação abortada.'];
+        return ['success' => false, 'added' => 0, 'seq' => $seqCarreg, 'message' => 'Falha ao criar cabeçalho do carregamento.'];
     }
 
     $car = [
-        'seq_carregamento' => $seq,
+        'seq_carregamento' => $seqCarreg,
         'placa' => $placa,
         'placa_provisoria' => $placa,
         'destino' => '',
@@ -638,66 +690,66 @@ function criar_carregamento_ssw($conn, string $domain, string $unidade, string $
         'setores_entrega' => '',
         'origem_criacao' => 'SSW',
     ];
+
     $res = restore_zerado($conn, $domain, $unidade, $login, $car, $manifestos, $dtSaida, $dtSaida);
-    if (!$res['success'] || (int)($res['added'] ?? 0) <= 0) {
-        @pg_query_params($conn, "DELETE FROM {$tabelaCap} WHERE unidade = $1 AND seq_carregamento = $2", [$unidade, $seq]);
-        @pg_query_params($conn, "DELETE FROM {$tabela} WHERE unidade = $1 AND seq_carregamento = $2", [$unidade, $seq]);
-        return ['success' => false, 'added' => 0, 'seq' => $seq, 'message' => 'Nenhum CT-e novo nos manifestos; carregamento não criado.'];
-    }
-
-    // Preenche destino/unidades a partir dos CT-es inseridos e localiza a linha.
-    try {
-        $destinos = [];
-        $resDest = @pg_query_params(
+    if (!$res['success']) {
+        // Falha ao inserir CT-es: remove o cabeçalho criado para não deixar lixo.
+        @pg_query_params(
             $conn,
-            "SELECT DISTINCT UPPER(BTRIM(destino_cte)) AS d
-             FROM {$tabela}
-             WHERE unidade = $1 AND seq_carregamento = $2
-               AND COALESCE(nro_cte, 0) > 0
-               AND COALESCE(TRIM(destino_cte), '') <> ''",
-            [$unidade, $seq]
+            "DELETE FROM {$tabelaCap} WHERE unidade = $1 AND seq_carregamento = $2",
+            [$unidade, $seqCarreg]
         );
-        while ($resDest && ($rd = pg_fetch_assoc($resDest))) {
-            $d = strtoupper(trim((string)($rd['d'] ?? '')));
-            if ($d !== '') $destinos[$d] = true;
-        }
-        $destinos = array_keys($destinos);
-        sort($destinos);
-        if (count($destinos) > 0) {
-            $destinoCar = $destinos[0];
-            $unidadesCsv = implode(',', array_slice($destinos, 1));
-            @pg_query_params(
-                $conn,
-                "UPDATE {$tabela} SET destino = $3, unidades = $4
-                 WHERE unidade = $1 AND seq_carregamento = $2",
-                [$unidade, $seq, $destinoCar, $unidadesCsv]
-            );
-
-            if (count($destinos) === 1 && pg_table_exists($conn, "{$domain}_linha")) {
-                $resLinha = @pg_query_params(
-                    $conn,
-                    "SELECT nro_linha FROM {$domain}_linha
-                     WHERE UPPER(BTRIM(sigla_emit)) = $1 AND UPPER(BTRIM(sigla_dest)) = $2
-                     ORDER BY nro_linha DESC LIMIT 1",
-                    [$unidade, $destinoCar]
-                );
-                if ($resLinha && pg_num_rows($resLinha) > 0) {
-                    $nroLinha = (int)pg_fetch_result($resLinha, 0, 0);
-                    if ($nroLinha > 0) {
-                        @pg_query_params($conn, "UPDATE {$tabelaCap} SET nro_linha = $3 WHERE unidade = $1 AND seq_carregamento = $2", [$unidade, $seq, $nroLinha]);
-                    }
-                }
-            }
-        }
-    } catch (Exception $e) {
-        // best-effort: o carregamento já existe com os CT-es inseridos
+        return ['success' => false, 'added' => 0, 'seq' => $seqCarreg, 'message' => (string)($res['message'] ?? 'erro')];
     }
 
-    return ['success' => true, 'added' => (int)$res['added'], 'seq' => $seq];
+    $added = (int)($res['added'] ?? 0);
+    if ($added === 0) {
+        // Nenhum CT-e encontrado: remove o cabeçalho criado para não deixar lixo.
+        @pg_query_params(
+            $conn,
+            "DELETE FROM {$tabelaCap} WHERE unidade = $1 AND seq_carregamento = $2",
+            [$unidade, $seqCarreg]
+        );
+        return ['success' => true, 'added' => 0, 'seq' => $seqCarreg, 'message' => 'Nenhum CT-e nos manifestos; carregamento descartado.'];
+    }
+
+    return ['success' => true, 'added' => $added, 'seq' => $seqCarreg, 'message' => 'Carregamento criado e finalizado.'];
+}
+
+/**
+ * Verifica se já existe carregamento no Presto para a MESMA placa e MESMA data.
+ * Existente tem prioridade: se houver, o manifesto do SSW0125 NÃO gera novo
+ * carregamento. A data é comparada tanto na inclusão quanto na finalização
+ * (cobre carregamentos abertos e finalizados). No RVE a placa é comparada
+ * pelo sufixo de 4 caracteres.
+ */
+function carregamento_existente_na_data($conn, string $domain, string $unidade, string $placa, DateTime $dt, bool $isRve): bool {
+    $tabela = "{$domain}_carregamento";
+    $data = $dt->format('Y-m-d');
+    $matchPlaca = $isRve
+        ? "RIGHT(UPPER(BTRIM(placa_provisoria)), 4) = RIGHT(UPPER($2), 4)"
+        : "UPPER(BTRIM(placa_provisoria)) = UPPER($2)";
+    $res = @pg_query_params(
+        $conn,
+        "SELECT 1 FROM {$tabela}
+         WHERE unidade = $1
+           AND {$matchPlaca}
+           AND (data_inclusao::date = $3::date OR data_finalizacao = $3::date)
+         LIMIT 1",
+        [$unidade, $placa, $data]
+    );
+    return ($res && @pg_num_rows($res) > 0);
 }
 
 $dominioFiltro = strtoupper(trim((string)($argv[1] ?? '')));
 $unidadeFiltro = strtoupper(trim((string)($argv[2] ?? '')));
+
+// Período manual (prioridade sobre o cálculo automático por unidade).
+$periodoIni = parse_dmy_arg($argv[3] ?? null);
+$periodoFim = parse_dmy_arg($argv[4] ?? null);
+if ($periodoIni !== null && $periodoFim !== null && $periodoFim->getTimestamp() < $periodoIni->getTimestamp()) {
+    [$periodoIni, $periodoFim] = [$periodoFim, $periodoIni];
+}
 
 echo_hr();
 echo "ATUALIZAÇÃO DE CARREGAMENTOS (TRANSFERÊNCIA) - SISTEMA PRESTO\n";
@@ -705,6 +757,11 @@ echo_hr();
 echo "Data/Hora: " . date('d/m/Y H:i:s') . "\n";
 echo "Domínio:   " . ($dominioFiltro !== '' ? $dominioFiltro : 'TODOS') . "\n";
 echo "Unidade:   " . ($unidadeFiltro !== '' ? $unidadeFiltro : 'TODAS') . "\n";
+if ($periodoIni !== null && $periodoFim !== null) {
+    echo "Período:   " . $periodoIni->format('d/m/Y') . " → " . $periodoFim->format('d/m/Y') . " (manual, com prioridade)\n";
+} else {
+    echo "Período:   últimos 2 dias até hoje (padrão)\n";
+}
 echo_hr();
 echo "\n";
 
@@ -814,6 +871,43 @@ while ($rowD = pg_fetch_array($resDomains)) {
         $porUnidade[$u][] = $r;
     }
 
+    // Garante que TODAS as unidades sejam processadas (mesmo as que não têm
+    // carregamentos existentes), pois o SSW0125 pode trazer manifestos que
+    // gerarão novos carregamentos finalizados. Se a coluna efetua_carregamento
+    // existir, filtra por ela; senão inclui todas.
+    {
+        $tblUnidCandidatas = [strtolower($domain) . '_unidade', strtolower($domain) . '_unidades'];
+        $tblUnidade = '';
+        foreach ($tblUnidCandidatas as $t) {
+            if (pg_table_exists($g_sql, $t)) { $tblUnidade = $t; break; }
+        }
+        if ($tblUnidade !== '') {
+            $temEfetua = (function() use ($g_sql, $tblUnidade): bool {
+                $r = @pg_query_params(
+                    $g_sql,
+                    "SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND lower(table_name) = $1 AND lower(column_name) = 'efetua_carregamento'
+                     LIMIT 1",
+                    [$tblUnidade]
+                );
+                return ($r && @pg_num_rows($r) > 0);
+            })();
+            $qUnid = "SELECT UPPER(TRIM(sigla)) AS sigla FROM {$tblUnidade} WHERE COALESCE(TRIM(sigla), '') <> ''";
+            if ($temEfetua) {
+                $qUnid .= " AND COALESCE(efetua_carregamento, FALSE) = TRUE";
+            }
+            if ($unidadeFiltro !== '') {
+                $qUnid .= " AND UPPER(TRIM(sigla)) = '" . pg_escape_string($g_sql, $unidadeFiltro) . "'";
+            }
+            $resUnid = @pg_query($g_sql, $qUnid);
+            while ($resUnid && ($ru = pg_fetch_assoc($resUnid))) {
+                $u = strtoupper(trim((string)($ru['sigla'] ?? '')));
+                if ($u === '') continue;
+                if (!isset($porUnidade[$u])) $porUnidade[$u] = [];
+            }
+        }
+    }
+
     if (count($porUnidade) === 0) {
         echo "✅ Nenhum carregamento para processar (transferência) neste domínio.\n\n";
         continue;
@@ -883,23 +977,18 @@ while ($rowD = pg_fetch_array($resDomains)) {
             return $a['_dt_inclusao']->getTimestamp() <=> $b['_dt_inclusao']->getTimestamp();
         });
 
-        $dtMinUnidade = null;
-        $dtMaxUnidade = null;
-        foreach ($items as $it) {
-            $dtInclRaw = trim((string)($it['dt_inclusao'] ?? ''));
-            if ($dtInclRaw === '') continue;
-            try { $dtIncl = new DateTime($dtInclRaw); } catch (Exception $e) { $dtIncl = null; }
-            if (!$dtIncl) continue;
-            if ($dtMinUnidade === null || $dtIncl->getTimestamp() < $dtMinUnidade->getTimestamp()) $dtMinUnidade = $dtIncl;
-            if ($dtMaxUnidade === null || $dtIncl->getTimestamp() > $dtMaxUnidade->getTimestamp()) $dtMaxUnidade = $dtIncl;
+        if ($periodoIni !== null && $periodoFim !== null) {
+            // Período manual tem prioridade: aplica a todas as unidades.
+            $dtMinUnidade = clone $periodoIni;
+            $fimUnidade = clone $periodoFim;
+        } else {
+            // Sem período informado: consulta sempre os últimos 2 dias até hoje,
+            // garantindo que manifestos recentes sem carregamento sejam criados.
+            $hoje = new DateTime(date('Y-m-d'));
+            $fimUnidade = clone $hoje;
+            $dtMinUnidade = clone $hoje;
+            $dtMinUnidade->modify('-2 days');
         }
-        if ($dtMinUnidade === null || $dtMaxUnidade === null) {
-            echo "   ⚠️  Não foi possível determinar o período de inclusão.\n\n";
-            continue;
-        }
-
-        $fimUnidade = clone $dtMaxUnidade;
-        $fimUnidade->modify('+2 days');
         [$dtMinUnidade, $fimUnidade] = clampDmyRange($dtMinUnidade, $fimUnidade);
         echo "   📅 SSW0125(PER) {$unidade}: " . $dtMinUnidade->format('d/m/Y') . " → " . $fimUnidade->format('d/m/Y') . "\n";
 
@@ -938,9 +1027,6 @@ while ($rowD = pg_fetch_array($resDomains)) {
                     foreach (($viagem['manifestos'] ?? []) as $seqMan => $_) {
                         $placaParaInfo[$placa][$ts]['manifestos'][(string)$seqMan] = true;
                     }
-                    foreach (($viagem['placas'] ?? []) as $pr => $_) {
-                        $placaParaInfo[$placa][$ts]['placas'][(string)$pr] = true;
-                    }
                 }
             }
 
@@ -960,7 +1046,6 @@ while ($rowD = pg_fetch_array($resDomains)) {
         $restoredTotal = 0;
         $semSaidaCorrespondente = 0;
         $semManifesto = 0;
-        $criadosTotal = 0;
 
         // No RVE, cargas com o mesmo sufixo (4 últimos caracteres) referenciam o
         // mesmo veículo e são combinadas no mesmo cenário de saída. Nos demais
@@ -1068,80 +1153,67 @@ while ($rowD = pg_fetch_array($resDomains)) {
             }
         }
 
-        // Criação de carregamentos a partir de agrupamentos da PER sem carga
-        // correspondente no Presto. Só considera saídas dos últimos 2 dias e
-        // agrupamentos com CT-es nos manifestos (f18) — nunca cria carga vazia.
-        $limiteCriacao = new DateTime('today');
-        $limiteCriacao->modify('-2 days');
-        $seqName = "{$domain}_seq_carregamento_seq";
+        // ============================================================
+        // Cria carregamentos FINALIZADOS a partir de manifestos do
+        // SSW0125 que não foram ligados a nenhum carregamento existente.
+        // ============================================================
+        $criadosDeManifesto = 0;
+        $ctesCriadosDeManifesto = 0;
         foreach ($placaParaInfo as $chave => $viagens) {
             if (!is_array($viagens)) continue;
+            $utilizadas = $viagensUtilizadasPorChave[$chave] ?? [];
             foreach ($viagens as $ts => $viagem) {
                 $ts = (int)$ts;
                 if ($ts <= 0) continue;
-                if (isset($viagensUtilizadasPorChave[$chave][(string)$ts])) continue;
-                if ($ts < $limiteCriacao->getTimestamp()) continue;
-
-                $dtSaida = $viagem['saida'] ?? null;
-                if (!($dtSaida instanceof DateTime)) continue;
+                if (isset($utilizadas[(string)$ts])) continue;
 
                 $manifestos = isset($viagem['manifestos']) && is_array($viagem['manifestos'])
                     ? array_keys($viagem['manifestos'])
                     : [];
                 if (count($manifestos) === 0) continue;
 
-                $placaReal = '';
-                foreach (($viagem['placas'] ?? []) as $pr => $_) {
-                    $pr = strtoupper(trim((string)$pr));
-                    if ($pr !== '') { $placaReal = $pr; break; }
-                }
-                if ($placaReal === '') $placaReal = strtoupper((string)$chave);
-                if ($placaReal === '') continue;
+                $dtSaida = $viagem['saida'] ?? null;
+                if (!($dtSaida instanceof DateTime)) continue;
 
-                $dataSaidaCria = $dtSaida->format('Y-m-d');
-                $horaSaidaCria = $dtSaida->format('H:i:s');
+                // Para placas não-RVE a chave é a própria placa; no RVE é o
+                // sufixo de 4 caracteres (gravamos a placa real do veículo).
+                $placaUsar = resolver_placa_para_chave($g_sql, $domain, (string)$chave);
+                if ($placaUsar === '') continue;
 
-                // Idempotência: não recria se já existe carregamento para esta
-                // placa (no RVE, pelo sufixo) com a mesma data/hora de finalização.
-                $chaveCria = $isRve ? substr($placaReal, -4) : $placaReal;
-                $condPlaca = $isRve
-                    ? "RIGHT(UPPER(BTRIM(placa_provisoria)), 4) = \$1"
-                    : "UPPER(BTRIM(placa_provisoria)) = \$1";
-                $resJa = @pg_query_params(
-                    $g_sql,
-                    "SELECT 1 FROM {$tblCar}
-                     WHERE unidade = \$2
-                       AND {$condPlaca}
-                       AND data_finalizacao = \$3::date
-                       AND hora_finalizacao = \$4::time
-                     LIMIT 1",
-                    [$chaveCria, $unidade, $dataSaidaCria, $horaSaidaCria]
-                );
-                if ($resJa && pg_num_rows($resJa) > 0) {
-                    $viagensUtilizadasPorChave[$chave][(string)$ts] = true;
+                // Existente tem prioridade: se já há carregamento no Presto para
+                // a mesma placa (ou sufixo, no RVE) e a mesma data, não cria.
+                $isRveUnidade = (strtoupper($domain) === 'RVE');
+                if (carregamento_existente_na_data($g_sql, $domain, $unidade, $placaUsar, $dtSaida, $isRveUnidade)) {
+                    echo "   ℹ️  {$placaUsar}: já existe carregamento nesta data (" . $dtSaida->format('d/m/Y') . "); manifesto não gera novo carregamento.\n";
                     continue;
                 }
 
-                $saidaFmt = $dtSaida->format('d/m/Y H:i:s');
-                $resCria = criar_carregamento_ssw(
-                    $g_sql, $domain, $unidade, $loginScript, $placaReal, $seqName, $manifestos, $dtSaida
+                $resCria = criar_carregamento_de_manifestos(
+                    $g_sql,
+                    $domain,
+                    $unidade,
+                    $loginScript,
+                    $placaUsar,
+                    $manifestos,
+                    $dtSaida
                 );
-                if (!empty($resCria['success'])) {
-                    $criadosTotal++;
-                    $restoredTotal += (int)($resCria['added'] ?? 0);
-                    $viagensUtilizadasPorChave[$chave][(string)$ts] = true;
-                    echo "   🆕 Criado: {$placaReal} (seq " . (int)($resCria['seq'] ?? 0) . ") saída {$saidaFmt} "
-                        . count($manifestos) . " manifesto(s), +" . (int)($resCria['added'] ?? 0) . " CT-es.\n";
+                if ($resCria['success'] && (int)($resCria['added'] ?? 0) > 0) {
+                    $criadosDeManifesto++;
+                    $ctesCriadosDeManifesto += (int)$resCria['added'];
+                    echo "   🆕 Criado carregamento " . (int)$resCria['seq']
+                        . " ({$placaUsar}) de " . count($manifestos) . " manifesto(s), "
+                        . (int)$resCria['added'] . " CT-es, saída " . $dtSaida->format('d/m/Y H:i:s') . ".\n";
                 } else {
-                    echo "   ⚠️  Não criado carregamento {$placaReal} saída {$saidaFmt}: "
-                        . (string)($resCria['message'] ?? 'erro não identificado') . "\n";
+                    echo "   ⚠️  Manifestos sem carregamento para {$placaUsar} (saída "
+                        . $dtSaida->format('d/m/Y H:i:s') . "): "
+                        . (string)($resCria['message'] ?? 'erro') . "\n";
                 }
             }
         }
 
         echo "   ✅ Finalizações atualizadas: {$finalizacoesAtualizadas}\n";
         echo "   ✅ CT-es acrescentados: {$restoredTotal}\n";
-        echo "   ✅ Carregamentos criados: {$criadosTotal}\n";
+        echo "   🆕 Carregamentos criados de manifestos: {$criadosDeManifesto} ({$ctesCriadosDeManifesto} CT-es)\n";
         echo "   ⚠️  Cargas sem saída correspondente: {$semSaidaCorrespondente}; sem manifesto f18: {$semManifesto}\n\n";
     }
 }
@@ -1149,3 +1221,4 @@ while ($rowD = pg_fetch_array($resDomains)) {
 echo_hr();
 echo "FIM\n";
 echo_hr();
+
