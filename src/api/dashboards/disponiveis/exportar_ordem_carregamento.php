@@ -814,12 +814,14 @@ $sheet->mergeCells('A23:B23');
 $sheet->mergeCells('C23:D23');
 $sheet->mergeCells('E23:F23');
 $sheet->mergeCells('G23:H23');
-$sheet->mergeCells('I23:L23');
+$sheet->mergeCells('I23:J23');
+$sheet->mergeCells('K23:L23');
 $sheet->setCellValue('A23', 'TOTAL DE CTRCs');
 $sheet->setCellValue('C23', 'TOTAL DE VOLUMES');
 $sheet->setCellValue('E23', 'TOTAL PESO REAL');
 $sheet->setCellValue('G23', 'TOTAL CUBAGEM (m³)');
 $sheet->setCellValue('I23', 'TOTAL PESO CALC');
+$sheet->setCellValue('K23', 'FRETE DISPONÍVEL (R$)');
 $sheet->getStyle('A23:L23')->applyFromArray($styleLabel);
 $sheet->getStyle('A23:L23')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -827,12 +829,14 @@ $sheet->mergeCells('A24:B24');
 $sheet->mergeCells('C24:D24');
 $sheet->mergeCells('E24:F24');
 $sheet->mergeCells('G24:H24');
-$sheet->mergeCells('I24:L24');
+$sheet->mergeCells('I24:J24');
+$sheet->mergeCells('K24:L24');
 $sheet->setCellValue('A24', $totalCtrcs > 0 ? $totalCtrcs : '');
 $sheet->setCellValue('C24', $totalVolumes > 0 ? $totalVolumes : '');
 $sheet->setCellValue('E24', $totalPesoReal > 0 ? $totalPesoReal : '');
 $sheet->setCellValue('G24', $totalCubagem > 0 ? $totalCubagem : '');
 $sheet->setCellValue('I24', $totalPesoCalc > 0 ? $totalPesoCalc : '');
+$sheet->setCellValue('K24', $freteDisponivelTotal);
 $sheet->getStyle('A24:L24')->applyFromArray([
     'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => '0B2F5B']],
     'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
@@ -840,25 +844,16 @@ $sheet->getStyle('A24:L24')->applyFromArray([
 $sheet->getStyle('E24')->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
 $sheet->getStyle('G24')->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
 $sheet->getStyle('I24')->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
+$sheet->getStyle('K24')->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
 
 $sheet->getStyle('A22:L24')->applyFromArray($styleGrid);
 
-$sheet->mergeCells('A25:D25');
-$sheet->mergeCells('E25:L25');
-$sheet->setCellValue('A25', 'FRETE DISPONÍVEL (R$)');
-$sheet->setCellValue('E25', $freteDisponivelTotal);
-$sheet->getStyle('A25:D25')->applyFromArray($styleLabel);
-$sheet->getStyle('E25:L25')->applyFromArray($styleValue);
-$sheet->getStyle('E25:L25')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-$sheet->getStyle('A25:L25')->applyFromArray($styleGrid);
-$sheet->getStyle('E25')->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
+$sheet->mergeCells('A25:L25');
+$sheet->setCellValue('A25', 'NOTAS FISCAIS / ITENS CARREGADOS');
+$sheet->getStyle('A25:L25')->applyFromArray($styleDarkBar);
 
-$sheet->mergeCells('A26:L26');
-$sheet->setCellValue('A26', 'NOTAS FISCAIS / ITENS CARREGADOS');
-$sheet->getStyle('A26:L26')->applyFromArray($styleDarkBar);
-
-$headerRow = 27;
-$dataRowStart = 28;
+$headerRow = 26;
+$dataRowStart = 27;
 $dataRowsCount = max(count($linhas), 1);
 $totalRow = $dataRowStart + $dataRowsCount;
 $maxTableRows = max($dataRowsCount + 1 + 8, 20);
