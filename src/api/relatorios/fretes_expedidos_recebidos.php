@@ -256,15 +256,6 @@ $sswFetch = static function(string $url, int $tries = 3): string {
     return (string)$last;
 };
 
-$lerXml1440 = static function() use ($extractXml, $sswFetch): ?SimpleXMLElement {
-    $raw = (string)$sswFetch('https://tms.ssw.inf.br/bin/ssw1440', 3);
-    if ($raw === '') return null;
-    if (stripos($raw, '504 Gateway Time-out') !== false) return null;
-    $xmlStr = $extractXml($raw);
-    if (stripos($xmlStr, '<xml') === false) return null;
-    return @simplexml_load_string($xmlStr) ?: null;
-};
-
 $get1440Rows = static function() use ($parse1440RowsFromRaw, $sswFetch): array {
     $raw = (string)$sswFetch('https://tms.ssw.inf.br/bin/ssw1440', 3);
     return $parse1440RowsFromRaw($raw);
@@ -623,8 +614,8 @@ if ($step === 'POLL') {
         respondJson(['success' => false, 'message' => 'Parâmetros inválidos para consulta de status (baseline_seq/request_start_ts).']);
     }
 
-    $xml1440 = $lerXml1440();
-    if (!$xml1440) {
+    $rows = $get1440Rows();
+    if (empty($rows)) {
         respondJson([
             'success' => false,
             'message' => 'Não foi possível ler a fila do SSW (1440) neste momento (erro/timeout do SSW).',
@@ -632,45 +623,26 @@ if ($step === 'POLL') {
     }
 
     $candidate = null;
-    $candidateSit = '';
+    $candidateSeq = -1;
 
-    for ($i = 0; $i <= 200; $i++) {
-        $seq = $xml1440->xpath('rs/r/f0')[$i] ?? null;
-        $opc = $xml1440->xpath('rs/r/f1')[$i] ?? null;
-        $usr = $xml1440->xpath('rs/r/f3')[$i] ?? null;
-        $sit = $xml1440->xpath('rs/r/f6')[$i] ?? null;
-        $f8  = $xml1440->xpath('rs/r/f8')[$i] ?? null;
-        $f2  = $xml1440->xpath('rs/r/f2')[$i] ?? null;
+    foreach ($rows as $r) {
+        if (!$isOpcFretes((string)($r['opc'] ?? ''))) continue;
 
-        if ($seq === null) break;
+        $usrNorm = $normSswUser((string)($r['usr'] ?? ''));
+        if ($usrNorm !== '' && !in_array($usrNorm, $allowedSswUsers, true)) continue;
 
-        $seqVal = (int)$seq;
+        $seqVal = (int)($r['seq'] ?? 0);
         if ($seqVal <= 0) continue;
 
-        $opcStr = (string)$opc;
-        if (substr(trim($opcStr), 0, 3) !== '453') continue;
-
-        $usrStr = trim((string)$usr);
-        $usrNorm = $normSswUser($usrStr);
-        if (!in_array($usrNorm, $allowedSswUsers, true)) continue;
-
-        $sitStr = (string)$sit;
-
         $okBySeq = ($seqVal > $baselineSeqIn);
-        $f2ts = $parseF2Ts((string)$f2);
+        $f2ts = $parseF2Ts((string)($r['f2'] ?? ''));
         $okByTime = ($f2ts !== null && $f2ts >= ($requestStartTsIn - 5));
         if (!$okBySeq && !$okByTime) continue;
 
-        $candidate = [
-            'seq' => $seqVal,
-            'opc' => (string)$opcStr,
-            'usr' => (string)$usrStr,
-            'sit' => (string)$sitStr,
-            'f8'  => (string)$f8,
-            'f2'  => (string)$f2,
-        ];
-        $candidateSit = $sitStr;
-        break;
+        if ($seqVal > $candidateSeq) {
+            $candidate = $r;
+            $candidateSeq = $seqVal;
+        }
     }
 
     if (!$candidate) {
@@ -680,8 +652,20 @@ if ($step === 'POLL') {
         ]);
     }
 
-    $sitNorm = $normStatus($candidateSit);
-    if (strpos($sitNorm, 'CONCLUIDO') === false) {
+    // A conclusão é identificada pelo conteúdo do f8 (links de download do
+    // arquivo .sswweb ou o aviso de "nenhum registro"), e NÃO pela situação
+    // textual do SSW — que varia em grafia/acentuação entre retornos e fazia
+    // o relatório concluído ficar preso em "Em processamento".
+    $f8raw = (string)($candidate['f8'] ?? '');
+    $f8dec = ($f8raw !== '') ? html_entity_decode($f8raw, ENT_QUOTES | ENT_HTML5, 'UTF-8') : '';
+
+    $hasNone = (stripos($f8dec, 'Nenhum registro encontrado') !== false);
+    $hasLinks = (stripos($f8dec, '.sswweb') !== false)
+        || (stripos($f8dec, 'ajaxEnvia(') !== false)
+        || (stripos($f8dec, 'abrir(') !== false);
+
+    if (!$hasNone && !$hasLinks) {
+        $sitNorm = $normStatus((string)($candidate['sit'] ?? ''));
         respondJson([
             'success' => true,
             'status' => 'pending',
@@ -689,24 +673,7 @@ if ($step === 'POLL') {
         ]);
     }
 
-    $f8raw = (string)($candidate['f8'] ?? '');
-    if ($f8raw === '') {
-        respondJson([
-            'success' => true,
-            'status' => 'pending',
-        ]);
-    }
-
-    $f8dec = html_entity_decode($f8raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    $hasLinksOrNone = (stripos($f8dec, 'ajaxEnvia(') !== false) || (stripos($f8dec, 'Nenhum registro encontrado') !== false);
-    if (!$hasLinksOrNone) {
-        respondJson([
-            'success' => true,
-            'status' => 'pending',
-        ]);
-    }
-
-    if (stripos($f8dec, 'Nenhum registro encontrado') !== false) {
+    if ($hasNone) {
         $emptyMsg = 'Nenhum registro encontrado para os parâmetros informados.';
         if (preg_match('/Nenhum registro encontrado[^<]*/i', $f8dec, $mm)) {
             $emptyMsg = trim($mm[0]);
@@ -721,6 +688,13 @@ if ($step === 'POLL') {
     }
 
     $acts = $extractActsFromF8($f8raw);
+    if (empty($acts)) {
+        respondJson([
+            'success' => true,
+            'status' => 'pending',
+        ]);
+    }
+
     respondJson([
         'success' => true,
         'status' => 'ready',
