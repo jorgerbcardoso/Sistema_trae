@@ -680,8 +680,8 @@ if ($step === 'POLL') {
         ]);
     }
 
-    if ($candidateSit !== 'Conclu&iacute;do') {
-        $sitNorm = $normStatus($candidateSit);
+    $sitNorm = $normStatus($candidateSit);
+    if (strpos($sitNorm, 'CONCLUIDO') === false) {
         respondJson([
             'success' => true,
             'status' => 'pending',
@@ -707,10 +707,15 @@ if ($step === 'POLL') {
     }
 
     if (stripos($f8dec, 'Nenhum registro encontrado') !== false) {
+        $emptyMsg = 'Nenhum registro encontrado para os parâmetros informados.';
+        if (preg_match('/Nenhum registro encontrado[^<]*/i', $f8dec, $mm)) {
+            $emptyMsg = trim($mm[0]);
+        }
         respondJson([
             'success' => true,
             'status' => 'ready',
             'result' => 'empty',
+            'message' => $emptyMsg,
             'ssw_seq' => (int)($candidate['seq'] ?? 0),
         ]);
     }

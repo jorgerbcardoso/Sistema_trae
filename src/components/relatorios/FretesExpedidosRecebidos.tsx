@@ -655,6 +655,7 @@ export function FretesExpedidosRecebidos() {
 
       let acts: string[] = [];
       let empty = false;
+      let emptyMsg = '';
 
       for (let i = 0; i < 25; i++) {
         if (runRef.current !== runId) return;
@@ -681,6 +682,7 @@ export function FretesExpedidosRecebidos() {
         if (poll.status === 'ready') {
           if (poll.result === 'empty') {
             empty = true;
+            emptyMsg = poll.message || '';
             break;
           }
           acts = poll.acts || [];
@@ -696,7 +698,7 @@ export function FretesExpedidosRecebidos() {
 
       if (empty) {
         setStatus('');
-        toast.info('Nenhum registro encontrado para os parâmetros informados.');
+        toast.info(emptyMsg || 'Nenhum registro encontrado para os parâmetros informados.');
         return;
       }
 
