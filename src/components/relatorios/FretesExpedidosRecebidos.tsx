@@ -76,6 +76,7 @@ type PollResponse = {
   success: boolean;
   message?: string;
   status?: 'pending' | 'ready';
+  stage?: 'waiting' | 'processing';
   result?: 'empty' | 'links';
   ssw_seq?: number;
   acts?: string[];
@@ -650,6 +651,8 @@ export function FretesExpedidosRecebidos() {
         return;
       }
 
+      setStatus('Relatório solicitado ao TMS');
+
       let acts: string[] = [];
       let empty = false;
 
@@ -683,6 +686,8 @@ export function FretesExpedidosRecebidos() {
           acts = poll.acts || [];
           break;
         }
+
+        if (poll.stage === 'processing') setStatus('Relatório em processamento');
 
         await new Promise((r) => setTimeout(r, 1000));
       }
@@ -796,6 +801,7 @@ export function FretesExpedidosRecebidos() {
                 <FilterSelectUnidadeSingle
                   value={filters.sigla_unid}
                   onChange={(v) => setFilters({ ...filters, sigla_unid: v || '' })}
+                  respectUserUnit
                 />
               </div>
             </div>

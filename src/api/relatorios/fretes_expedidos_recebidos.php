@@ -121,6 +121,11 @@ if (in_array($step, ['RUN', 'START'], true)) {
 }
 
 ssw_login($domain);
+// O usuário SSW está cadastrado na unidade SSA (não em MTZ). O ssw0057 só
+// aceita gerar relatório da unidade da sessão ("Somente pode tirar relatorio
+// da sua unidade"); trocar para MTZ, que enxerga todas, libera o relatório
+// para qualquer sigla informada.
+ssw_go('https://tms.ssw.inf.br/bin/menu01?act=TRO&f2=MTZ&f3=101');
 set_time_limit(180);
 ini_set('memory_limit', '512M');
 
@@ -676,9 +681,11 @@ if ($step === 'POLL') {
     }
 
     if ($candidateSit !== 'Conclu&iacute;do') {
+        $sitNorm = $normStatus($candidateSit);
         respondJson([
             'success' => true,
             'status' => 'pending',
+            'stage' => (stripos($sitNorm, 'PROCESS') !== false) ? 'processing' : 'waiting',
         ]);
     }
 
@@ -718,6 +725,25 @@ if ($step === 'POLL') {
     ]);
 }
 
+/**
+ * Dispara o relatório (ssw0057) e devolve a resposta crua do SSW.
+ * A resposta NÃO pode ser ignorada: sem ela, um erro do SSW (sessão,
+ * unidade ou parâmetro inválido) passa como sucesso e nada entra na fila.
+ */
+$dispararRelatorio057 = static function(array $params) use ($sswFetch): array {
+    $params['dummy'] = (string)((int)(microtime(true) * 1000));
+    $url = 'https://tms.ssw.inf.br/bin/ssw0057?' . http_build_query($params);
+    $raw = (string)$sswFetch($url, 2);
+    $dec = html_entity_decode(urldecode($raw), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $texto = trim((string)preg_replace('/\s+/', ' ', strip_tags($dec)));
+    $ok = ($dec !== '') && (
+        stripos($dec, 'processamento') !== false
+        || stripos($dec, 'ajaxEnvia(') !== false
+        || stripos($dec, 'abrir(') !== false
+    );
+    return ['url' => $url, 'decoded' => $dec, 'texto' => $texto, 'ok' => $ok];
+};
+
 if ($step === 'START') {
     $rowsBefore = $get1440Rows();
     $baselineSeq = 0;
@@ -731,7 +757,7 @@ if ($step === 'START') {
         'tp_unid' => 'A',
     ];
 
-    if ($siglaUnid !== '') $params['sigla_unid'] = strtolower($siglaUnid);
+    if ($siglaUnid !== '') $params['sigla_unid'] = $siglaUnid;
     if ($cgcCliente !== '') $params['cgc_cliente'] = $cgcCliente;
     if ($tpCliente !== '') $params['tp_cliente'] = $tpCliente;
     if ($hasEmissao) {
@@ -743,11 +769,18 @@ if ($step === 'START') {
         $params['data_ent_fin'] = date('dmy', strtotime($entregaFim));
     }
 
-    $params['dummy'] = (string)((int)(microtime(true) * 1000));
-    $q = http_build_query($params);
     $requestStartTs = time();
+    $disparo = $dispararRelatorio057($params);
 
-    $sswFetch("https://tms.ssw.inf.br/bin/ssw0057?$q", 2);
+    if (!$disparo['ok']) {
+        respondJson([
+            'success' => false,
+            'message' => 'O SSW não confirmou o processamento do relatório.'
+                . ($disparo['texto'] !== ''
+                    ? ' Retorno do SSW: ' . mb_substr($disparo['texto'], 0, 400)
+                    : ' O SSW não retornou resposta (verifique a sessão/credenciais).'),
+        ]);
+    }
 
     respondJson([
         'success' => true,
@@ -763,7 +796,7 @@ $params = [
     'tp_unid' => 'A',
 ];
 
-if ($siglaUnid !== '') $params['sigla_unid'] = strtolower($siglaUnid);
+if ($siglaUnid !== '') $params['sigla_unid'] = $siglaUnid;
 if ($cgcCliente !== '') $params['cgc_cliente'] = $cgcCliente;
 if ($tpCliente !== '') $params['tp_cliente'] = $tpCliente;
 if ($hasEmissao) {
@@ -775,16 +808,23 @@ if ($hasEntrega) {
     $params['data_ent_fin'] = date('dmy', strtotime($entregaFim));
 }
 
-$params['dummy'] = (string)((int)(microtime(true) * 1000));
-
-$q = http_build_query($params);
 $requestStartTs = time();
 $rowsBefore = $get1440Rows();
 $baselineSeq = 0;
 foreach ($rowsBefore as $r) {
     $baselineSeq = max($baselineSeq, (int)$r['seq']);
 }
-$sswFetch("https://tms.ssw.inf.br/bin/ssw0057?$q", 2);
+
+$disparo = $dispararRelatorio057($params);
+if (!$disparo['ok']) {
+    respondJson([
+        'success' => false,
+        'message' => 'O SSW não confirmou o processamento do relatório.'
+            . ($disparo['texto'] !== ''
+                ? ' Retorno do SSW: ' . mb_substr($disparo['texto'], 0, 400)
+                : ' O SSW não retornou resposta (verifique a sessão/credenciais).'),
+    ]);
+}
 
 $jobRow = null;
 $deadline = time() + 45;
